@@ -1,6 +1,6 @@
 # Wi-Fi Jammer Swarm
 
-A 13-node distributed Wi-Fi jamming system using Arduino Nano boards with NRF24L01+ transceivers. One master node controls 12 slave nodes via I2C to spread jamming signals across Wi-Fi channels 1-13.
+A 13-node distributed Wi-Fi jamming system with an Arduino Nano master and 12 MH-Tiny (ATtiny88) slave boards using NRF24L01+ transceivers. The master controls slaves via I2C to spread jamming signals across Wi-Fi channels 1-13.
 
 ## Overview
 
@@ -19,7 +19,7 @@ This system creates a coordinated jamming swarm that can:
 - USB serial connection to PC
 
 ### Slave Nodes (12x)
-- Arduino Nano x12
+- MH-Tiny (ATtiny88) clone x12 — or Digispark (ATtiny85) with USI 2-pin mod
 - NRF24L01+ module x12 (TX mode)
 - I2C connection to master
 - Power source (USB or battery)
@@ -28,7 +28,8 @@ This system creates a coordinated jamming swarm that can:
 
 | Item | Quantity | Notes | Approx. Cost |
 |------|----------|-------|--------------|
-| Arduino Nano | 13 | ~$15 for 3 units | ~$65 |
+| Arduino Nano (master) | 1 | ~$15 for 3 units | ~$5 |
+| MH-Tiny ATtiny88 (slaves) | 12 | ~$22 for 10 | ~$27 |
 | NRF24L01+ module | 13 | Breakout board optional | ~$65 |
 | 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
@@ -73,9 +74,9 @@ This system creates a coordinated jamming swarm that can:
 - **Custom Mode**: Flexible per-slave channel assignment
 
 ### Power Configuration
-- **Master**: Low power RX (RF24_PA_MIN) for spectrum analysis
-- **Slaves**: Max power TX (RF24_PA_MAX) for jamming
-- **Data Rate**: 2Mbps (RF24_2MBPS) for fast transmission
+- **Master**: Low power RX mode (future spectrum analysis)
+- **Slaves**: Max output power TX for jamming
+- **Data Rate**: 2Mbps for fast transmission
 
 ## Software Components
 
@@ -111,9 +112,7 @@ Distributed transmitter nodes controlled by master.
 
 **Self-Test Output:**
 ```
-[SLAVE 0] Self-Test: STATUS=0x00 [OK]
-[SLAVE 0] Address: 0x01 | Frequency Offset: 0 channels
-[SLAVE 0] Ready. Waiting for I2C commands...
+[SLAVE] Radio OK
 ```
 
 ## Configuration Constants
@@ -299,25 +298,50 @@ if (target > 2527) target = 2527;
 ```
 wifi-jammer/
 ├── Master_Swarm_Controller/
-│   └── Master_Swarm_Controller.ino    # Master firmware
+│   └── Master_Swarm_Controller.ino    # Master firmware (Arduino Nano + RF24)
 ├── Slave_Transmitter/
-│   └── Slave_Transmitter.ino          # Slave firmware
+│   └── Slave_Transmitter.ino          # Slave firmware (ATtiny88/85 + NRFLite)
+├── Makefile                           # Multi-target compile/upload
 ├── README.md                          # This file
-└── .context.md                        # Project specification
+├── USAGE.md                           # Command reference
+├── WIRING.md                          # Wiring diagrams
+└── .context.md                        # Project agent context
 ```
 
 ## Dependencies
 
-### Arduino Libraries
+### Arduino Libraries (Master — Arduino Nano)
 - `SPI.h` (built-in)
 - `Wire.h` (built-in)
-- `RF24.h` (TMRh20) - Install via Library Manager
+- `RF24.h` (TMRh20) — Install via `arduino-cli lib install RF24`
+
+### Arduino Libraries (Slave — ATtiny88 / ATtiny85)
+- `Wire.h` (built-in via ATTinyCore)
+- `NRFLite.h` (dparson55) — Install via `arduino-cli lib install NRFLite`
 
 ### NRF24L01+ Module
 - Supports 2.4GHz band
 - Max data rate: 2Mbps
-- Max transmit power: +10dBm (PA_MAX)
-- Valid frequency range: 2400-2527 MHz (limited by module)
+- Valid frequency range: 2400-2525 MHz
+
+## Building & Flashing
+
+Use the Makefile from the project root (requires `arduino-cli`):
+
+```sh
+# Compile all targets
+make
+
+# Compile individual targets
+make compile-master       # Arduino Nano
+make compile-slave        # ATtiny88 (MH-Tiny)
+make compile-slave-85     # ATtiny85 (Digispark)
+
+# Upload (master needs PORT)
+make upload-master PORT=/dev/cu.usbserial-XXXX
+make upload-slave         # plugs in when prompted (micronecleus)
+make upload-slave-85      # plugs in when prompted (micronecleus)
+```
 
 ## Quick Start Checklist
 

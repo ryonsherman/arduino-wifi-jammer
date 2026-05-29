@@ -58,8 +58,11 @@
 
 ## Slave Nodes (0x01-0x0C)
 
+The slaves use MH-Tiny ATtiny88 clones (TQFP-32) with ATTinyCore board package.
+Pin numbers below are Arduino-logical (mapped by ATTinyCore).
+
 +---------------------------------------------+
-|              ARDUINO NANO                    |
+|            MH-TINY (ATTINY88)                |
 |                                              |
 |   +-------------------------------------+    |
 |   |           NRF24L01+ MODULE           |    |
@@ -67,17 +70,17 @@
 |   |   VCC  ----+------------------------+    |
 |   |             | (3.3V critical!)         |    |
 |   |   GND  ----+------------------------+    |
-|   |   CE   ----+------- Pin 9               |    |
-|   |   CSN  ----+------- Pin 10              |    |
-|   |   SCK  ----+------- Pin 13 (SPI SCK)    |    |
-|   |   MISO ----+------- Pin 12 (SPI MISO)   |    |
-|   |   MOSI ----+------- Pin 11 (SPI MOSI)   |    |
+|   |   CE   ----+------- Pin 9  (PB1)        |    |
+|   |   CSN  ----+------- Pin 10 (PB2)        |    |
+|   |   SCK  ----+------- Pin 13 (PB5)        |    |
+|   |   MISO ----+------- Pin 12 (PB4)        |    |
+|   |   MOSI ----+------- Pin 11 (PB3)        |    |
 |   |   IRQ  ----+------- (optional)          |    |
 |   +-------------------------------------+    |
 |                                              |
 |   I2C Connections:                          |
-|   SDA  ------------------------ Pin A4       |
-|   SCL  ------------------------ Pin A5       |
+|   SDA  ------------------------ Pin 23 (PC4) |
+|   SCL  ------------------------ Pin 24 (PC5) |
 |                                              |
 |   Configuration:                            |
 |   #define SLAVE_ID X (X = 0-11)             |
@@ -164,7 +167,8 @@
 
 | Node Type            | Max Current | Typical Current |
 |----------------------|-------------|-----------------|
-| Arduino Nano         | 50mA        | 20mA            |
+| Arduino Nano (master)| 50mA        | 20mA            |
+| MH-Tiny ATtiny88     | 10mA        | 5mA             |
 | NRF24L01+ TX mode    | 11.5mA      | 10mA            |
 | NRF24L01+ RX mode    | 14.5mA      | 12mA            |
 | **Total per Slave**  | ~62mA       | ~32mA           |
@@ -180,8 +184,8 @@ Pre-Flight Wiring Check:
 
 [ ] All nodes share common GND
 [ ] NRF24L01+ VCC: 3.3V (direct to module) or 5V (if breakout has regulator)
-[ ] SDA (A4) connected on all nodes
-[ ] SCL (A5) connected on all nodes
+[ ] SDA connected on all nodes (Nano A4, MH-Tiny Pin 23)
+[ ] SCL connected on all nodes (Nano A5, MH-Tiny Pin 24)
 [ ] CE pin (9) connected on all nodes
 [ ] CSN pin (10) connected on all nodes
 [ ] SPI pins (11, 12, 13) connected on all nodes
