@@ -2,28 +2,29 @@
 
 ## System Overview
 
-                    MASTER NODE
-          (Arduino Nano + NRF24L01+)
-          I2C Address: 0x70
-          NRF24 Mode: RX
+                      MASTER NODE
+            (Arduino Nano + NRF24L01+)
+            I2C Address: 0x70
+            NRF24 Mode: RX
 
-          USB ---> Serial Monitor (115200 baud)
+            USB ---> Serial Monitor (115200 baud)
 
-          SDA ----+-----------------------------+
-          SCL ----+-----------------------------+
-          VCC ----+-----------------------------+
-          GND ----+-----------------------------+
-                  |                             |
-                  |         I2C BUS             |
-                  |     (SDA/SCL parallel)      |
-                  |                             |
-     +------------+-------------+
-     |           |             |
-  +--+--+    +--+--+       +--+--+
-  |SLAVE|    |SLAVE|       |SLAVE|
-  | #1  |    | #2  |       | #12 |
-  |0x01 |    |0x02 |       |0x0C |
-  +-----+    +-----+       +-----+
+            SDA ----+---------------------------+
+            SCL ----+---------------------------+
+            VCC ----+---------------------------+
+            GND ----+---------------------------+
+                    |                           |
+                    |         I2C BUS           |
+                    |    (SDA/SCL parallel)     |
+                    |                           |
+      +-------------+-----------+
+      |             |           |
+  +---+----+   +---+----+   +---+----+
+  | MH-TINY|   | MH-TINY|   | MH-TINY|
+  | SLAVE  |   | SLAVE  |   | SLAVE  |
+  |  #0    |   |  #1    |   |  #11   |
+  | 0x01   |   | 0x02   |   | 0x0C   |
+  +--------+   +--------+   +--------+
 
 
 ## Master Node (0x70)
@@ -105,17 +106,17 @@ Pin numbers below are Arduino-logical (mapped by ATTinyCore).
 
 ## Wiring Table
 
-| Connection | Master | Slave 0 | Slave 1 | Slave 2 | ... | Slave 11 |
-|------------|--------|---------|---------|---------|-----|----------|
-| SDA        | A4     | A4      | A4      | A4      | ... | A4       |
-| SCL        | A5     | A5      | A5      | A5      | ... | A5       |
-| VCC        | 3.3V   | 3.3V    | 3.3V    | 3.3V    | ... | 3.3V     |
-| GND        | GND    | GND     | GND     | GND     | ... | GND      |
-| CE         | Pin 9  | Pin 9   | Pin 9   | Pin 9   | ... | Pin 9    |
-| CSN        | Pin 10 | Pin 10  | Pin 10  | Pin 10  | ... | Pin 10   |
-| SCK        | Pin 13 | Pin 13  | Pin 13  | Pin 13  | ... | Pin 13   |
-| MOSI       | Pin 11 | Pin 11  | Pin 11  | Pin 11  | ... | Pin 11   |
-| MISO       | Pin 12 | Pin 12  | Pin 12  | Pin 12  | ... | Pin 12   |
+| Connection | Master (Nano) | Slaves (MH-Tiny) |
+|------------|---------------|------------------|
+| SDA        | A4            | Pin 23 (PC4)     |
+| SCL        | A5            | Pin 24 (PC5)     |
+| VCC        | 3.3V          | 3.3V             |
+| GND        | GND           | GND              |
+| CE         | Pin 9         | Pin 9  (PB1)     |
+| CSN        | Pin 10        | Pin 10 (PB2)     |
+| SCK        | Pin 13        | Pin 13 (PB5)     |
+| MOSI       | Pin 11        | Pin 11 (PB3)     |
+| MISO       | Pin 12        | Pin 12 (PB4)     |
 
 
 ## NRF24L01+ Module Pinout
