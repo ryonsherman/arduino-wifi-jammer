@@ -1,0 +1,342 @@
+# Wi-Fi Jammer Swarm
+
+A 13-node distributed Wi-Fi jamming system using Arduino Nano boards with NRF24L01+ transceivers. One master node controls 12 slave nodes via I2C to spread jamming signals across Wi-Fi channels 1-13.
+
+## Overview
+
+This system creates a coordinated jamming swarm that can:
+- Cover a single Wi-Fi channel with all 12 slaves (maximum power density)
+- Spread across all 13 channels (60MHz span) for full spectrum coverage
+- Use custom distribution patterns for targeted jamming
+- Maintain configuration between start/stop cycles
+- Report status and frequency distribution via USB Serial
+
+## Hardware Requirements
+
+### Master Node (1x)
+- Arduino Nano x1
+- NRF24L01+ module x1 (RX mode, future spectrum analyzer)
+- USB serial connection to PC
+
+### Slave Nodes (12x)
+- Arduino Nano x12
+- NRF24L01+ module x12 (TX mode)
+- I2C connection to master
+- Power source (USB or battery)
+
+### Components Bill of Materials
+
+| Item | Quantity | Notes | Approx. Cost |
+|------|----------|-------|--------------|
+| Arduino Nano | 13 | ~$15 for 3 units | ~$65 |
+| NRF24L01+ module | 13 | Breakout board optional | ~$65 |
+| 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
+| 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
+| 9V battery (USB rechargeable) | 4 | ~$20 for 4 units | ~$20 |
+| Buck converter (step-down) | 1 | ~$8 for 5 units | ~$2 |
+| 100uF capacitor | 1 | ~$5 for 20 units | ~$1 |
+
+**Estimated Total**: ~$159 for full 13-node swarm (battery power)
+
+### Connections
+- **I2C Bus**: SDA (A4), SCL (A5) on all nodes
+- **Master I2C Address**: 0x70
+- **Slave I2C Addresses**: 0x01-0x0C (set by SLAVE_ID)
+- **NRF24L01+ Pins** (Arduino Nano):
+  - CE: Pin 9
+  - CSN: Pin 10
+  - VCC: 3.3V (critical!)
+  - GND: Common ground
+  - MOSI, MISO, SCK: SPI bus
+
+## System Architecture
+
+### Communication Protocol
+- **Master to Slaves**: I2C 4-byte packets
+  - Byte 0: Mode (0=Full Spectrum, 1=Single Channel, 3=Custom)
+  - Byte 1: Channel (1-13 or 0 for full spectrum)
+  - Byte 2: Command (CMD_START=1, CMD_STOP=0)
+  - Byte 3: Padding (reserved)
+
+### Frequency Strategy
+- **Single Channel Mode**: All 12 slaves transmit on exact channel frequency
+  - Channel 1: 2412 MHz
+  - Channel 6: 2437 MHz
+  - Channel 11: 2462 MHz
+  - Channel 13: 2472 MHz
+  - Other channels: 5MHz spacing between channels
+
+- **Full Spectrum Mode**: 12 slaves spread across 60MHz at 5MHz spacing
+  - Coverage: 2415, 2420, 2425...2470 MHz
+  - Mid-channel positioning for maximum coverage
+
+- **Custom Mode**: Flexible per-slave channel assignment
+
+### Power Configuration
+- **Master**: Low power RX (RF24_PA_MIN) for spectrum analysis
+- **Slaves**: Max power TX (RF24_PA_MAX) for jamming
+- **Data Rate**: 2Mbps (RF24_2MBPS) for fast transmission
+
+## Software Components
+
+### Master Controller (`Master_Swarm_Controller.ino`)
+Main control node with USB Serial interface for commands.
+
+**Commands:**
+- `help` - Display command list
+- `get [ids]` - Query slave configurations (e.g., `get 0,1,2` or `get all`)
+- `set <distribution>` - Set custom distribution (e.g., `set 4@1,2@6,2@11`)
+- `channel <n>` - Set single channel (1-13) or full spectrum (0)
+- `start` - Begin transmitting with current configuration
+- `stop` - Halt transmission (keep configuration)
+- `status` - Show slave distribution and frequency map
+
+**Distribution Syntax:**
+- Format: `n@channel1,n@channel2,...`
+- Examples:
+  - `4@1,2@6,2@11,4@0` → 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 full spectrum
+  - `6@1,6@6` → 6 on ch1, 6 on ch6 (rest idle)
+  - `12@6` → all 12 on ch6
+  - `4@1,2@6` → 4 on ch1, 2 on ch6 (8 idle)
+
+### Slave Transmitter (`Slave_Transmitter.ino`)
+Distributed transmitter nodes controlled by master.
+
+**Features:**
+- USB Serial self-test on boot
+- I2C listener for master commands
+- Continuous random noise transmission (no ACK)
+- Frequency calculation based on mode/channel
+- Config persistence across stop/start cycles
+
+**Self-Test Output:**
+```
+[SLAVE 0] Self-Test: STATUS=0x00 [OK]
+[SLAVE 0] Address: 0x01 | Frequency Offset: 0 channels
+[SLAVE 0] Ready. Waiting for I2C commands...
+```
+
+## Configuration Constants
+
+### Master (`MASTER_ADDR = 0x70`)
+- `TOTAL_SLAVES = 12`
+- `SLAVE_ADDR_START = 0x01`
+- `SLAVE_ADDR_END = 0x0C`
+- `BASE_FREQ_2400 = 2400` (MHz)
+- `CHANNEL_1_BASE = 2412` (MHz)
+- `CHANNEL_13_BASE = 2472` (MHz)
+- `FULL_SPAN_MHZ = 60` (MHz)
+- `CHANNEL_SPACING = 5` (MHz)
+
+### Slave (`SLAVE_ID = 0-11`)
+- `I2C_ADDR = 0x01 + SLAVE_ID`
+- Same frequency constants as master
+- Mode values: 0=Full, 1=Single, 3=Custom
+
+## Operation Workflow
+
+### Setup Phase
+1. Connect all nodes to power and I2C bus
+2. Upload firmware to master (0x70) and slaves (0x01-0x0C)
+3. Master scans for slaves via I2C handshake
+4. Verify all 12 slaves respond
+
+### Configuration Phase
+1. Set desired mode:
+   - Single channel: `channel 6`
+   - Full spectrum: `channel 0`
+   - Custom: `set 4@1,2@6,2@11,4@0`
+2. Check configuration: `status`
+3. Verify slave responses
+
+### Execution Phase
+1. Start jamming: `start`
+2. Monitor status: `status` (real-time)
+3. Adjust as needed: `set`, `channel`
+4. Stop when done: `stop`
+
+### Persistence
+- Configuration persists across `stop`/`start` cycles
+- Reset requires physical restart (power cycle)
+
+## Example Status Outputs
+
+The following examples show the expected `status` command output for each mode:
+
+### 1. Custom Distribution Mode (`set 4@1,2@6,2@11,4@0`)
+```
+=== Slave Status ===
+Active: 12/12
+Channel 1: 4
+Channel 6: 2
+Channel 11: 2
+=== Channel Distribution ===
+Mode: Custom Distribution
+Slave 1 [ACTIVE] Channel: 1 (2415 MHz)
+Slave 2 [ACTIVE] Channel: 1 (2415 MHz)
+Slave 3 [ACTIVE] Channel: 1 (2415 MHz)
+Slave 4 [ACTIVE] Channel: 1 (2415 MHz)
+Slave 5 [ACTIVE] Channel: 6 (2420 MHz)
+Slave 6 [ACTIVE] Channel: 6 (2420 MHz)
+Slave 7 [ACTIVE] Channel: 11 (2475 MHz)
+Slave 8 [ACTIVE] Channel: 11 (2475 MHz)
+Slave 9 [ACTIVE] Channel: Full (2415 MHz)
+Slave 10 [ACTIVE] Channel: Full (2415 MHz)
+Slave 11 [ACTIVE] Channel: Full (2415 MHz)
+Slave 12 [ACTIVE] Channel: Full (2415 MHz)
+```
+
+### 2. Single Channel Mode (`channel 6`)
+```
+=== Slave Status ===
+Active: 12/12
+Channel: 6
+=== Channel Distribution ===
+Mode: Single Channel
+Slave 1 -> Channel 6 (2420 MHz)
+Slave 2 -> Channel 6 (2420 MHz)
+Slave 3 -> Channel 6 (2420 MHz)
+Slave 4 -> Channel 6 (2420 MHz)
+Slave 5 -> Channel 6 (2420 MHz)
+Slave 6 -> Channel 6 (2420 MHz)
+Slave 7 -> Channel 6 (2420 MHz)
+Slave 8 -> Channel 6 (2420 MHz)
+Slave 9 -> Channel 6 (2420 MHz)
+Slave 10 -> Channel 6 (2420 MHz)
+Slave 11 -> Channel 6 (2420 MHz)
+Slave 12 -> Channel 6 (2420 MHz)
+```
+
+### 3. Full Spectrum Mode (`channel 0`)
+```
+=== Slave Status ===
+Active: 12/12
+Channel: All
+=== Channel Distribution ===
+Mode: Full Spectrum
+Slave 1 -> Freq 2415 (2415 MHz)
+Slave 2 -> Freq 2420 (2420 MHz)
+Slave 3 -> Freq 2425 (2425 MHz)
+Slave 4 -> Freq 2430 (2430 MHz)
+Slave 5 -> Freq 2435 (2435 MHz)
+Slave 6 -> Freq 2440 (2440 MHz)
+Slave 7 -> Freq 2445 (2445 MHz)
+Slave 8 -> Freq 2450 (2450 MHz)
+Slave 9 -> Freq 2455 (2455 MHz)
+Slave 10 -> Freq 2460 (2460 MHz)
+Slave 11 -> Freq 2465 (2465 MHz)
+Slave 12 -> Freq 2470 (2470 MHz)
+```
+
+## Frequency Calculations
+
+### Single Channel Mode
+All slaves transmit on exact channel frequency:
+```cpp
+if (channel == 1) target = 2412;  // MHz
+else if (channel == 6) target = 2437;
+else if (channel == 11) target = 2462;
+else if (channel == 13) target = 2472;
+else target = 2412;  // default
+```
+
+### Full Spectrum Mode
+Slaves spread at 5MHz intervals:
+```cpp
+double step = 60.0 / 12.0;  // 5.0 MHz spacing
+target = 2412 + 3 + (slave_id * step);
+// Slaves hit: 2415, 2420, 2425, 2430, 2435, 2440, 2445, 2450, 2455, 2460, 2465, 2470
+```
+
+### Range Validation
+NRF24L01+ valid range: 2400-2527 MHz
+```cpp
+if (target < 2400) target = 2400;
+if (target > 2527) target = 2527;
+```
+
+## Troubleshooting
+
+### Slave Not Found
+- Check I2C wiring (SDA, SCL, power, ground)
+- Verify slave address (0x01-0x0C)
+- Ensure all nodes share common ground
+- Check NRF24L01+ VCC (must be 3.3V, not 5V)
+
+### Frequency Issues
+- Verify `SLAVE_ID` is set correctly (0-11)
+- Check NRF24L01+ module calibration
+- Ensure power supply is stable (voltage drops affect frequency)
+
+### Communication Errors
+- Master should report correct slave count (12)
+- `get` command should show active/idle status per slave
+- `status` command shows frequency distribution
+
+### Configuration Not Persisting
+- Check `stop` command was issued before power cycle
+- Configuration only resets on physical restart
+- Verify `current_mode` variable is not overwritten
+
+## Future Enhancements
+
+### Planned Features
+- **Button Input**: Replace USB serial with physical buttons for command entry
+- **OLED Display**: Real-time status display on master node
+- **Spectrum Analyzer**: NRF24L01+ RX-only module for real-time frequency analysis
+- **Auto-Distribution**: Intelligent channel allocation based on detected activity
+- **Power Management**: Sleep modes for battery operation
+- **LED Indicators**: Visual feedback for jamming status
+
+### Performance Optimizations
+- Reduce loop delay from 100ms to 10ms for faster command response
+- Implement command queuing for rapid mode switching
+- Add watchdog timer for slave recovery
+- Optimize random noise generation for faster transmission
+
+## File Structure
+
+```
+wifi-jammer/
+├── Master_Swarm_Controller/
+│   └── Master_Swarm_Controller.ino    # Master firmware
+├── Slave_Transmitter/
+│   └── Slave_Transmitter.ino          # Slave firmware
+├── README.md                          # This file
+└── .context.md                        # Project specification
+```
+
+## Dependencies
+
+### Arduino Libraries
+- `SPI.h` (built-in)
+- `Wire.h` (built-in)
+- `RF24.h` (TMRh20) - Install via Library Manager
+
+### NRF24L01+ Module
+- Supports 2.4GHz band
+- Max data rate: 2Mbps
+- Max transmit power: +10dBm (PA_MAX)
+- Valid frequency range: 2400-2527 MHz (limited by module)
+
+## Quick Start Checklist
+
+- [ ] All 13 nodes powered and connected
+- [ ] Master I2C address set to 0x70
+- [ ] Slaves I2C addresses set to 0x01-0x0C
+- [ ] NRF24L01+ modules connected (CE, CSN, SPI, VCC, GND)
+- [ ] Common ground between all nodes
+- [ ] USB serial monitor open to master (115200 baud)
+- [ ] Firmware compiled and uploaded
+- [ ] Slave self-tests pass
+- [ ] Master scan shows 12 slaves
+
+## License
+
+This project is open source. Use freely for Wi-Fi jamming applications.
+
+---
+
+**Version**: 1.0  
+**Last Updated**: May 2026  
+**Authors**: Distributed System Team
