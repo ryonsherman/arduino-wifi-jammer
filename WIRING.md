@@ -189,26 +189,16 @@ All nodes must share common ground
 ## Connection Checklist
 
 Pre-Flight Wiring Check:
-
-[ ] All nodes share common GND
-
-[ ] NRF24L01+ VCC: 3.3V (direct to module) or 5V (if breakout has regulator)
-
-[ ] SDA connected on all nodes (Nano A4, MH-Tiny Pin 23)
-
-[ ] SCL connected on all nodes (Nano A5, MH-Tiny Pin 24)
-
-[ ] CE pin (9) connected on all nodes
-
-[ ] CSN pin (10) connected on all nodes
-
-[ ] SPI pins (11, 12, 13) connected on all nodes
-
-[ ] Antenna attached to all NRF24L01+ modules
-
-[ ] Master connected to USB serial
-
-[ ] Power source capable of 1A+
+- All nodes share common GND
+- NRF24L01+ VCC: 3.3V (direct to module) or 5V (if breakout has regulator)
+- SDA connected on all nodes (Nano A4, MH-Tiny Pin 23)
+- SCL connected on all nodes (Nano A5, MH-Tiny Pin 24)
+- CE pin (9) connected on all nodes
+- CSN pin (10) connected on all nodes
+- SPI pins (11, 12, 13) connected on all nodes
+- Antenna attached to all NRF24L01+ modules
+- Master connected to USB serial
+- Power source capable of 1A+
 
 
 ## I2C Address Verification
