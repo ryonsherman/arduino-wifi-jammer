@@ -34,7 +34,8 @@ Alternatively, **Digispark (ATtiny85)** with USI 2-pin SPI mod (limited to 2 sla
 | Item | Quantity | Notes | Approx. Cost |
 |------|----------|-------|--------------|
 | Arduino Nano (master) | 1 | ~$15 for 3 units | ~$5 |
-| Arduino Nano (slaves) | 12 | Alternatively, MH-Tiny ATtiny88 ~$2.20 each | ~$60 |
+| Arduino Nano (slaves) | 12 | Easier option, 3.3V built-in | ~$60 |
+| MH-Tiny ATtiny88 (slaves) | 12 | Cheaper, no 3.3V reg, needs USB adapter | ~$27 |
 | NRF24L01+ module | 13 | Breakout board optional | ~$65 |
 | 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
@@ -42,7 +43,7 @@ Alternatively, **Digispark (ATtiny85)** with USI 2-pin SPI mod (limited to 2 sla
 | Buck converter (step-down) | 1 | ~$8 for 5 units | ~$2 |
 | 100uF capacitor | 1 | ~$5 for 20 units | ~$1 |
 
-**Estimated Total**: ~$159 (MH-Tiny slaves) / ~$219 (all Nano slaves) for full 13-node swarm
+**Estimated Total**: ~$159 (MH-Tiny) / ~$219 (all Nano) for full 13-node swarm
 
 ### Connections
 - **I2C Bus**: SDA (A4), SCL (A5) on all nodes
