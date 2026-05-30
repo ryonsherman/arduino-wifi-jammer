@@ -65,6 +65,7 @@ static uint8_t current_mode = MODE_FULL_SPECTRUM;
 static bool jamming_active = false;
 static bool hw_jamming_active = false;  // Hardware switch state
 static uint32_t last_status_ms = 0;
+static uint8_t current_power = 3;  // 0=MIN, 1=LOW, 2=HIGH, 3=MAX (default)
 
 // Packed slave config: 4 bytes per slave instead of 4 (struct padding eliminated)
 // Layout: [channel:4bits][active:1bit][unused:3bits] = 1 byte per slave
@@ -78,6 +79,7 @@ static uint8_t slave_cfg[TOTAL_SLAVES];  // Was 48 bytes (struct), now 12 bytes
 /**
  * Send I2C command to a specific slave
  * Byte 4 packs local_idx (high nibble) + group_size (low nibble) for fan-out
+ * Byte 5: power level (0=MIN, 1=LOW, 2=HIGH, 3=MAX)
  */
 static void send_cmd(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cmd, uint8_t local_idx, uint8_t group_size) {
   Wire.beginTransmission(SLAVE_ADDR_START + slave_id);
@@ -85,6 +87,7 @@ static void send_cmd(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cm
   Wire.write(channel);
   Wire.write(cmd);
   Wire.write(((local_idx & 0x0F) << 4) | (group_size & 0x0F));
+  Wire.write(current_power);
   Wire.endTransmission();
 }
 
@@ -511,6 +514,8 @@ static void print_help() {
   Serial.println(F("snapshot 30 - RF snapshot 30s collection"));
   Serial.println(F("scan 6      - Live scan ch 6, 10s (default)"));
   Serial.println(F("scan 6 30   - Live scan ch 6 for 30s"));
+  Serial.println(F("power 1-4   - TX power (1=MIN, 2=LOW, 3=HIGH, 4=MAX)"));
+  Serial.println(F("power       - Show current power"));
   Serial.println(F("======================================"));
 }
 
@@ -739,6 +744,28 @@ void executeCommand(String &cmdLine) {
     if (sec > 60) sec = 60;
     
     cmd_scan_channel(ch, sec);
+    
+  } else if (cmd == F("power")) {
+    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
+    if (args.length() == 0) {
+      Serial.print(F("Power: "));
+      Serial.print(current_power + 1);
+      Serial.print(F(" ("));
+      if (current_power == 0) Serial.print(F("MIN"));
+      else if (current_power == 1) Serial.print(F("LOW"));
+      else if (current_power == 2) Serial.print(F("HIGH"));
+      else Serial.print(F("MAX"));
+      Serial.println(F(")"));
+    } else {
+      uint8_t p = args.toInt();
+      if (p < 1 || p > 4) {
+        Serial.println(F("Use 1-4 (1=MIN, 2=LOW, 3=HIGH, 4=MAX)"));
+      } else {
+        current_power = p - 1;
+        Serial.print(F("Power set to "));
+        Serial.println(p);
+      }
+    }
     
   } else {
     Serial.print(F("Unknown: "));

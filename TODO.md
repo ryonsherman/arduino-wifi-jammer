@@ -28,7 +28,7 @@
   Adaptive jamming stopped
   ```
 
-- [ ] **Power Levels** — Adjust NRF24L01+ TX power. Serial commands:
+- [x] **Power Levels** — Adjust NRF24L01+ TX power. Serial commands:
   ```
   power <1-4>     Set TX power level (1=MIN, 2=LOW, 3=HIGH, 4=MAX)
   power           Show current power level

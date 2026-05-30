@@ -14,6 +14,7 @@
  */
 
 #include <NRFLite.h>
+#include <SPI.h>
 #include <Wire.h>
 #include <SoftwareSerial.h>
 
@@ -35,7 +36,7 @@ SoftwareSerial mySerial(SOFT_RX, SOFT_TX);
 #endif
 
 // Protocol constants
-#define PACKET_SIZE 4
+#define PACKET_SIZE 5
 #define MAX_FREQ_OFFSET 83
 #define TOTAL_SLAVES 12
 
@@ -51,11 +52,13 @@ static volatile uint8_t pending_flags = 0;    // bit 0: jamming, bit 1: has_pend
 static volatile uint8_t pending_mode = 0;
 static volatile uint8_t pending_channel = 0;
 static volatile uint8_t pending_fanout = (TOTAL_SLAVES);  // packed: local_idx<<4 | group_size
+static volatile uint8_t pending_power = 3;  // 0=MIN, 1=LOW, 2=HIGH, 3=MAX
 
 static uint8_t current_jamming = 0;
 static uint8_t current_mode = 0;
 static uint8_t current_channel = 0;
 static uint8_t current_fanout = (TOTAL_SLAVES);  // packed: local_idx<<4 | group_size
+static uint8_t current_power = 3;  // 0=MIN, 1=LOW, 2=HIGH, 3=MAX
 
 // Unpack fanout: local_idx from high nibble, group_size from low nibble
 #define FANOUT_LOCAL_IDX(f)  ((f) >> 4)
@@ -69,6 +72,14 @@ NRFLite radio;
 // Fast 8-bit LFSR for noise generation (faster than random())
 static uint8_t lfsr = 0xAC;  // Non-zero seed
 #define LFSR_NEXT() (lfsr = (lfsr >> 1) ^ (-(lfsr & 1u) & 0xB8))
+
+static void slave_set_power(uint8_t level) {
+  if (level > 3) level = 3;
+  digitalWrite(CSN_PIN, LOW);
+  SPI.transfer(0x20 | 0x06);
+  SPI.transfer(0x09 | (level << 1));
+  digitalWrite(CSN_PIN, HIGH);
+}
 
 /**
  * Calculate NRF24 channel (frequency offset from 2400 MHz)
@@ -141,6 +152,7 @@ static void parseSerial() {
 
             uint8_t freq = calc_freq(1, ch, 0, 1);
             radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, freq);
+            slave_set_power(current_power);
             mySerial.print(F("Jamming ch"));
             mySerial.print(ch);
             mySerial.print(F(" @ "));
@@ -183,6 +195,7 @@ static void transmit_noise() {
  * I2C receive handler - stores pending config for loop() to process
  * Validates packet size and channel bounds before accepting
  * Byte 4 format: local_idx (high nibble) | group_size (low nibble)
+ * Byte 5: power level (0=MIN, 1=LOW, 2=HIGH, 3=MAX)
  */
 void receiveI2C(int byteCount) {
   if (byteCount != PACKET_SIZE) return;
@@ -212,6 +225,9 @@ void receiveI2C(int byteCount) {
   pending_mode = mode;
   pending_channel = channel;
   pending_fanout = (local_idx << 4) | group_size;
+  if (byteCount >= 5) {
+    pending_power = Wire.read();
+  }
   
   // Set pending flag and jamming state
   if (cmd == 1) {
@@ -249,6 +265,7 @@ void loop() {
     current_mode = pending_mode;
     current_channel = pending_channel;
     current_fanout = pending_fanout;
+    current_power = pending_power;
     current_jamming = (flags & FLAG_JAMMING) ? 1 : 0;
   }
   SREG = sreg;
@@ -259,6 +276,7 @@ void loop() {
                                FANOUT_LOCAL_IDX(current_fanout), 
                                FANOUT_GROUP_SIZE(current_fanout));
       radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, freq);
+      slave_set_power(current_power);
       mySerial.print(F("@ "));
       mySerial.println(2400 + freq);
     } else {
