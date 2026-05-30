@@ -319,7 +319,7 @@ void poll_slave_status() {
   Serial.print(active);
   Serial.print(F("/12 jamming"));
   if (current_mode == MODE_FULL_SPECTRUM) {
-    Serial.print(F(" full spectrum"));
+    Serial.print(F(" all channels"));
   } else if (current_mode == MODE_SINGLE_CHANNEL) {
     Serial.print(F(" on ch "));
     Serial.print(selected_channel);
@@ -339,7 +339,7 @@ void poll_slave_status() {
           if (!first) Serial.print(',');
           first = false;
           if (custom_config[i].channel == 0) {
-            Serial.print(F("full"));
+            Serial.print(F("all"));
           } else {
             Serial.print(custom_config[i].channel);
           }
