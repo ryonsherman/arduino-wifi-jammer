@@ -4,23 +4,19 @@ Command Reference for Master Controller
 
 This guide provides quick reference for all master controller commands. Open USB Serial Monitor at 115200 baud to access the command interface.
 
+## COMMAND SUMMARY
 
-================================================================================
-COMMAND SUMMARY
-================================================================================
+| Command | Description |
+|---------|-------------|
+| help | Show all available commands |
+| get [ids] | Query slave configurations |
+| set \<distribution\> | Set custom channel distribution |
+| channel \<n\> | Set single channel (1-13) or full spectrum (0) |
+| start | Begin transmitting |
+| stop | Halt transmission (keep config) |
+| status | Show slave distribution and frequencies |
 
-help                  Show all available commands
-get [ids]            Query slave configurations
-set <distribution>   Set custom channel distribution
-channel <n>          Set single channel (1-13) or full spectrum (0)
-start                Begin transmitting
-stop                 Halt transmission (keep config)
-status               Show slave distribution and frequencies
-
-
-================================================================================
-COMMAND DETAILS
-================================================================================
+## COMMAND DETAILS
 
 ### 1. help
 
@@ -189,9 +185,7 @@ Example Output:
   ...
 
 
-================================================================================
-MODES OVERVIEW
-================================================================================
+## MODES OVERVIEW
 
 ### SINGLE CHANNEL MODE
 
@@ -224,60 +218,49 @@ Example: set 4@1,2@6,2@11,4@0
   -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 in full spectrum
 
 
-================================================================================
-USAGE EXAMPLES
-================================================================================
+## USAGE EXAMPLES
 
-Example 1: Single Channel Jamming
-----------------------------------
+### Example 1: Single Channel Jamming
 1. Connect to master via USB serial (115200 baud)
 2. Type: channel 6
 3. Type: status
 4. Type: start
 5. All 12 slaves transmit on channel 6
 
-Example 2: Full Spectrum Coverage
-----------------------------------
+### Example 2: Full Spectrum Coverage
 1. Type: channel 0
 2. Type: status
 3. Type: start
 4. Slaves spread across 2415-2470 MHz
 
-Example 3: Targeted Multi-Channel
----------------------------------
+### Example 3: Targeted Multi-Channel
 1. Type: set 4@1,4@6,4@11
 2. Type: status
 3. Type: start
 4. 4 slaves each on channels 1, 6, and 11
 
-Example 4: Stop and Restart
----------------------------
+### Example 4: Stop and Restart
 1. Type: stop (slaves idle, config retained)
 2. Type: channel 11 (change to channel 11)
 3. Type: status
 4. Type: start (restart on new channel)
 
-Example 5: Reset to Full Spectrum
----------------------------------
+### Example 5: Reset to Full Spectrum
 1. Type: stop
 2. Type: set 12@0
 3. Type: start
 4. All 12 slaves in full spectrum mode
 
-Example 6: Partial Deployment
------------------------------
+### Example 6: Partial Deployment
 1. Type: set 6@1,6@6
 2. Type: status
 3. Type: start
 4. 6 slaves on ch1, 6 on ch6, 6 idle
 
 
-================================================================================
-FREQUENCY TABLES
-================================================================================
+## FREQUENCY TABLES
 
-Wi-Fi Channel Frequencies (Single Channel Mode)
------------------------------------------------
+### Wi-Fi Channel Frequencies (Single Channel Mode)
 Channel | Frequency (MHz) | Notes
 --------|-----------------|------------------
 1       | 2412            | Common in US/EU
@@ -285,8 +268,7 @@ Channel | Frequency (MHz) | Notes
 11      | 2442            | Non-overlapping with 1,6
 13      | 2462            | EU only (US limit 11)
 
-Full Spectrum Mode Frequencies
-------------------------------
+### Full Spectrum Mode Frequencies
 Slave   | Frequency (MHz) | Channel Approx
 --------|-----------------|------------------
 1       | 2415            | Channel 1-2
@@ -303,45 +285,46 @@ Slave   | Frequency (MHz) | Channel Approx
 12      | 2470            | Channel 12-13
 
 
-================================================================================
-COMMAND SEQUENCE PATTERNS
-================================================================================
+## COMMAND SEQUENCE PATTERNS
 
-Pattern 1: Quick Setup
-----------------------
+### Pattern 1: Quick Setup
+```
 channel 6
 start
 status
+```
 
-Pattern 2: Mode Switch
-----------------------
+### Pattern 2: Mode Switch
+```
 stop
 channel 0
 start
+```
 
-Pattern 3: Custom Distribution
-------------------------------
+### Pattern 3: Custom Distribution
+```
 set 4@1,4@6,4@11
 status
 start
+```
 
-Pattern 4: Pause and Resume
----------------------------
+### Pattern 4: Pause and Resume
+```
 stop
 (status check)
 start
+```
 
-Pattern 5: Full Reset
----------------------
+### Pattern 5: Full Reset
+
+```
 stop
 set 12@0
 channel 0
 (start)
+```
 
-
-================================================================================
-TROUBLESHOOTING
-================================================================================
+## TROUBLESHOOTING
 
 Issue: "Slave Not Found"
 Solution:
@@ -377,9 +360,7 @@ Solution:
 - Check antenna attached
 
 
-================================================================================
-QUICK REFERENCE CARD
-================================================================================
+## QUICK REFERENCE CARD
 
 Command         | Syntax                     | Effect
 ----------------|----------------------------|------------------
@@ -392,16 +373,13 @@ stop            | stop                       | Halt TX
 status          | status                     | Show distribution
 
 
-Mode Values
------------
+### Mode Values
 0 = Full Spectrum (spread 60MHz)
 1 = Single Channel (all on one freq)
 3 = Custom Distribution (flexible)
 
 
-================================================================================
-NOTES
-================================================================================
+## NOTES
 
 - All commands case-insensitive
 - Configuration persists after 'stop'
@@ -412,9 +390,7 @@ NOTES
 - Power requirement: 1A+ supply for 13 nodes
 
 
-================================================================================
-VERSION
-================================================================================
+## VERSION
 
 Version: 1.0
 Last Updated: May 2026
