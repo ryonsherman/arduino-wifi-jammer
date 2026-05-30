@@ -32,11 +32,15 @@
 #define MODE_SINGLE_CHANNEL 1
 #define MODE_FULL_SPECTRUM 2
 
+// --- Status Polling ---
+#define STATUS_INTERVAL_MS 5000
+
 // --- State ---
 uint8_t slave_count = 0;
 bool jamming_active = false;
 uint8_t selected_channel = 0;
 uint8_t current_mode = MODE_FULL_SPECTRUM;
+unsigned long last_status_ms = 0;
 
 // --- Distribution Modes ---
 #define MODE_FULL_SPECTRUM 0
@@ -303,6 +307,25 @@ void print_custom_distribution() {
 }
 
 /**
+ * Poll all slaves via I2C and print their jamming status
+ */
+void poll_slave_status() {
+  uint8_t active = 0;
+  for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+    Wire.requestFrom((uint8_t)(SLAVE_ADDR_START + i), (uint8_t)1);
+    if (Wire.available() && Wire.read()) active++;
+  }
+  Serial.print(F("[STATUS] "));
+  Serial.print(active);
+  Serial.print(F("/12 jamming"));
+  if (current_mode == MODE_SINGLE_CHANNEL) {
+    Serial.print(F(" on ch "));
+    Serial.print(selected_channel);
+  }
+  Serial.println();
+}
+
+/**
  * Setup - runs once at boot
  * 
  * Initializes:
@@ -525,15 +548,21 @@ void executeCommand(String cmdLine) {
 }
 
 /**
- * Main loop - listens for serial commands
+ * Main loop - listens for serial commands and polls slave status
  * 
  * Reads commands from USB Serial line and executes them via executeCommand().
  * Commands are terminated by newline character.
+ * When jamming is active, polls slave status every STATUS_INTERVAL_MS.
  */
 void loop() {
   if (Serial.available()) {
     String cmdLine = Serial.readStringUntil('\n');
     executeCommand(cmdLine);
+  }
+  
+  if (jamming_active && millis() - last_status_ms >= STATUS_INTERVAL_MS) {
+    last_status_ms = millis();
+    poll_slave_status();
   }
   
   delay(100);  // Small delay to prevent CPU spin
