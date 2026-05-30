@@ -50,7 +50,7 @@ unsigned long last_status_ms = 0;
 // --- Custom Distribution ---
 typedef struct {
   uint8_t slave_id;
-  uint8_t channel;  // 0=full spectrum, 1-13=Wi-Fi channel
+  uint8_t channel;  // 1-13 = Wi-Fi channel
   bool active;
 } SlaveConfig;
 
@@ -61,7 +61,7 @@ SlaveConfig custom_config[TOTAL_SLAVES];
  * 
  * @param slave_id: Slave index (0-11), will be converted to I2C address (0x01-0x0C)
  * @param mode: Mode constant (0=Full Spectrum, 1=Single Channel, 3=Custom)
- * @param channel: Wi-Fi channel (1-13) or 0 for full spectrum
+ * @param channel: Wi-Fi channel (1-13)
  * @param cmd: CMD_START (1) to begin transmitting, CMD_STOP (0) to halt
  */
 void send_command_to_slave(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cmd) {
@@ -79,7 +79,7 @@ void send_command_to_slave(uint8_t slave_id, uint8_t mode, uint8_t channel, uint
  * @param start: Starting slave index (0-based)
  * @param end: Ending slave index (0-based)
  * @param mode: Mode constant (0=Full Spectrum, 1=Single Channel, 3=Custom)
- * @param channel: Wi-Fi channel (1-13) or 0 for full spectrum
+ * @param channel: Wi-Fi channel (1-13)
  * @param cmd: CMD_START (1) to begin transmitting, CMD_STOP (0) to halt
  */
 void send_command_to_slaves_range(uint8_t start, uint8_t end, uint8_t mode, uint8_t channel, uint8_t cmd) {
@@ -149,51 +149,23 @@ uint8_t scan_slaves() {
  * 
  * Frequency Strategy:
  * - Single Channel Mode: ALL 12 slaves transmit on exact channel frequency
- *   (e.g., all on 2437 MHz for channel 6) for maximum power density
+ *   (e.g., all on channel 6 = 2437 MHz) for maximum power density
  * - Full Spectrum Mode: 12 slaves spread across 60MHz at 5MHz spacing
  *   (2415, 2420, 2425...2470 MHz) covering channels 1-13
- * - Custom Mode: Each slave assigned to specific channel or full spectrum
+ * 
+ * The formula matches the slave's calc_freq() so the display is accurate:
+ *   Single channel: 12 + (ch - 1) * 5  → 2400 + offset = Wi-Fi center freq
+ *   Full spectrum:  15 + slave_id * 5   → 2415, 2420, 2425...
  * 
  * @param slave_id: 0-based slave index (0-11)
- * @param mode: Mode constant (0=Full Spectrum, 1=Single Channel, 3=Custom)
- * @param channel: Wi-Fi channel (1-13) or 0 for full spectrum
- * @return: Frequency offset in MHz from 2400 MHz (2400-2527 MHz range)
+ * @param mode: Mode constant (0=Full Spectrum, 1=Single Channel)
+ * @param channel: Wi-Fi channel (1-13)
+ * @return: Frequency offset in MHz from 2400 MHz
  */
 uint8_t calculate_freq_offset(uint8_t slave_id, uint8_t mode, uint8_t channel) {
-  double target;
-  
-  if (mode == MODE_CUSTOM) {
-    // Custom mode - jam exact channel frequency
-    target = (channel == 1) ? CHANNEL_1_BASE :
-             (channel == 6) ? 2437 :
-             (channel == 11) ? 2462 :
-             (channel == 13) ? CHANNEL_13_BASE : 2412;
-    
-    // Clamp to valid NRF24L01+ range (2400-2527 MHz)
-    if (target < 2400) target = 2400;
-    if (target > 2527) target = 2527;
-    return (uint8_t)(target - BASE_FREQ_2400);
-  }
-  
-  if (mode == MODE_SINGLE_CHANNEL) {
-    // Single channel - ALL slaves on exact channel frequency
-    target = (channel == 1) ? CHANNEL_1_BASE :
-             (channel == 6) ? 2437 :
-             (channel == 11) ? 2462 :
-             (channel == 13) ? CHANNEL_13_BASE : 2412;
-  } else {
-    // Full spectrum - mid-channel spacing (between channels)
-    // Spacing: 60MHz / 12 slaves = 5MHz between each slave
-    // Coverage: 2415, 2420, 2425, 2430, 2435, 2440, 2445, 2450, 2455, 2460, 2465, 2470
-    double step = FULL_SPAN_MHZ / (double)TOTAL_CHANNELS;
-    target = CHANNEL_1_BASE + 3 + (slave_id * step);
-  }
-  
-  // Clamp to valid NRF24L01+ range (2400-2527 MHz)
-  if (target < 2400) target = 2400;
-  if (target > 2527) target = 2527;
-  
-  return (uint8_t)(target - BASE_FREQ_2400);
+  if (mode == MODE_SINGLE_CHANNEL)
+    return 12 + (channel - 1) * 5;
+  return 15 + slave_id * 5;
 }
 
 /**
@@ -225,7 +197,7 @@ void print_frequency_map() {
       Serial.print(" [");
       Serial.print(status);
       Serial.print("] Channel: ");
-      Serial.print(custom_config[i].channel == 0 ? "Full" : String(custom_config[i].channel));
+      Serial.print(custom_config[i].channel);
       Serial.print(" (");
       Serial.print(2400 + freq);
       Serial.println(" MHz)");
@@ -245,7 +217,7 @@ void print_frequency_map() {
 
 /**
  * Calculate frequency for custom mode channel value
- * @param channel: Wi-Fi channel (1-13) or 0 for full spectrum
+ * @param channel: Wi-Fi channel (1-13)
  * @return: Frequency offset in MHz from 2400 MHz
  */
 uint8_t calculate_custom_freq(uint8_t channel) {
@@ -256,42 +228,42 @@ uint8_t calculate_custom_freq(uint8_t channel) {
 /**
  * Print custom distribution configuration summary
  * 
- * Displays active slave count and distribution across key channels:
- * - Counts active vs idle slaves
- * - Breaks down by Wi-Fi channels (1, 6, 11) and full spectrum mode
- * - Shows "Channel: All" for full spectrum mode
+ * Displays active slave count and distribution across channels.
  */
 void print_custom_distribution() {
   Serial.println("\n=== Slave Status ===");
   
   if (current_mode == MODE_CUSTOM) {
-    // Count slaves per channel for summary
-    uint8_t ch1_count = 0, ch6_count = 0, ch11_count = 0, idle_count = 0;
+    uint8_t active = 0, idle = 0;
+    uint8_t seen[TOTAL_SLAVES];
+    uint8_t seen_count = 0;
     
     for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
-      if (!custom_config[i].active) {
-        idle_count++;
-      } else if (custom_config[i].channel == 1) {
-        ch1_count++;
-      } else if (custom_config[i].channel == 6) {
-        ch6_count++;
-      } else if (custom_config[i].channel == 11) {
-        ch11_count++;
+      if (custom_config[i].active) {
+        active++;
+        bool dup = false;
+        for (uint8_t j = 0; j < seen_count; j++) {
+          if (seen[j] == custom_config[i].channel) { dup = true; break; }
+        }
+        if (!dup) seen[seen_count++] = custom_config[i].channel;
+      } else {
+        idle++;
       }
     }
     
     Serial.print("Active: ");
-    Serial.print(TOTAL_SLAVES - idle_count);
+    Serial.print(active);
     Serial.print("/12");
     Serial.println();
-    Serial.print("Channel 1: ");
-    Serial.print(ch1_count);
+    Serial.print("Idle: ");
+    Serial.print(idle);
     Serial.println();
-    Serial.print("Channel 6: ");
-    Serial.print(ch6_count);
+    Serial.print("Channels: ");
+    for (uint8_t i = 0; i < seen_count; i++) {
+      if (i) Serial.print(',');
+      Serial.print(seen[i]);
+    }
     Serial.println();
-    Serial.print("Channel 11: ");
-    Serial.println(ch11_count);
   } else {
     Serial.print("Active: ");
     Serial.print(TOTAL_SLAVES);
@@ -338,11 +310,7 @@ void poll_slave_status() {
         if (!dup) {
           if (!first) Serial.print(',');
           first = false;
-          if (custom_config[i].channel == 0) {
-            Serial.print(F("all"));
-          } else {
-            Serial.print(custom_config[i].channel);
-          }
+          Serial.print(custom_config[i].channel);
         }
       }
     }
@@ -453,8 +421,8 @@ void executeCommand(String cmdLine) {
           Serial.print(slaveId);
           Serial.print(": ");
           if (custom_config[slaveId].active) {
-            Serial.print("ACTIVE on ");
-            Serial.print(custom_config[slaveId].channel == 0 ? "full" : String(custom_config[slaveId].channel));
+            Serial.print("ACTIVE on ch ");
+            Serial.print(custom_config[slaveId].channel);
           } else {
             Serial.println("IDLE");
           }
@@ -468,11 +436,12 @@ void executeCommand(String cmdLine) {
     Serial.println("Setting custom distribution: " + args);
     
     // Parse distribution string (format: n@ch1,n@ch2,...)
-    // Examples: "4@1,2@6,2@11,4@0" or "6@1,6@6"
+    // Examples: "4@1,2@6,2@11" or "6@1,6@6"
+    bool valid = true;
     int pos = 0;
     uint8_t slave_idx = 0;
     
-    while (slave_idx < TOTAL_SLAVES && pos < args.length()) {
+    while (valid && slave_idx < TOTAL_SLAVES && pos < args.length()) {
       int commaPos = args.indexOf(',', pos);
       String segment = (commaPos != -1) ? 
                       args.substring(pos, commaPos) : 
@@ -482,6 +451,14 @@ void executeCommand(String cmdLine) {
       if (atPos != -1) {
         uint8_t count = segment.substring(0, atPos).toInt();
         uint8_t channel = segment.substring(atPos + 1).toInt();
+        
+        if (channel < 1 || channel > 13) {
+          Serial.print("[MASTER] Invalid channel: ");
+          Serial.println(channel);
+          Serial.println("Use channels 1-13 only. For full spectrum jamming, use 'channel 0' then 'start'.");
+          valid = false;
+          break;
+        }
         
         for (uint8_t i = 0; i < count && slave_idx < TOTAL_SLAVES; i++) {
           custom_config[slave_idx].slave_id = slave_idx;
@@ -493,6 +470,8 @@ void executeCommand(String cmdLine) {
       
       pos = (commaPos != -1) ? commaPos + 1 : args.length();
     }
+    
+    if (!valid) return;
     
     // Mark remaining slaves as idle (not specified in command)
     for (uint8_t i = slave_idx; i < TOTAL_SLAVES; i++) {

@@ -67,17 +67,17 @@ Configure custom channel distribution pattern.
 Usage: `set <distribution>`
 - Format: `n@channel1,n@channel2,...`
 - n = number of slaves to assign to channel
-- channel = Wi-Fi channel (1-13) or 0 for full spectrum
+- channel = Wi-Fi channel (1-13)
 - Unspecified slaves become idle
 
 Examples:
-  `set 4@1,2@6,2@11,4@0`
-     -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 in full spectrum mode
+  `set 4@1,2@6,2@11,4@6`
+     -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 on ch6
      -> All 12 slaves active
 
   `set 6@1,6@6`
      -> 6 slaves on ch1, 6 on ch6
-     -> 8 slaves become idle
+     -> No idle slaves
 
   `set 12@6`
      -> All 12 slaves on channel 6
@@ -86,12 +86,12 @@ Examples:
      -> 4 slaves on ch1, 2 on ch6
      -> 6 slaves become idle
 
-  `set 3@1,3@6,3@11,3@0`
-     -> Balanced distribution across 3 channels + full spectrum
+  `set 3@1,3@6,3@11,3@1`
+     -> Balanced distribution across 2 channels
 
 Distribution Syntax Rules:
 - Use comma to separate groups: `4@1,2@6`
-- Channel range: 1-13 or 0 (full spectrum)
+- Channel range: 1-13
 - Total slaves must not exceed 12
 - Slaves not assigned become idle (not transmitting)
 
@@ -224,8 +224,8 @@ Flexible assignment of slaves to specific channels.
 Best for: Targeted jamming of specific channels
 
 Usage: `set <distribution>`
-Example: `set 4@1,2@6,2@11,4@0`
-  -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 in full spectrum
+Example: `set 4@1,2@6,2@11,4@6`
+  -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 on ch6
 
 
 ## USAGE EXAMPLES
@@ -255,17 +255,17 @@ Example: `set 4@1,2@6,2@11,4@0`
 3. Type: `status`
 4. Type: `start` (restart on new channel)
 
-### Example 5: Reset to Full Spectrum
+### Example 5: Custom Distribution
 1. Type: `stop`
-2. Type: `set 12@0`
+2. Type: `set 12@6`
 3. Type: `start`
-4. All 12 slaves in full spectrum mode
+4. All 12 slaves on channel 6
 
 ### Example 6: Partial Deployment
 1. Type: `set 6@1,6@6`
 2. Type: `status`
 3. Type: `start`
-4. 6 slaves on ch1, 6 on ch6, 6 idle
+4. 6 slaves on ch1, 6 on ch6
 
 
 ## FREQUENCY TABLES
@@ -329,9 +329,8 @@ start
 
 ```
 stop
-set 12@0
 channel 0
-(start)
+start
 ```
 
 ## TROUBLESHOOTING
@@ -376,7 +375,7 @@ Command         | Syntax                     | Effect
 ----------------|----------------------------|------------------
 help            | help                       | Show commands
 get             | get or get 0,1,2           | Query slaves
-set             | set 4@1,2@6,2@11,4@0       | Custom dist
+set             | set 4@1,2@6,2@11           | Custom dist
 channel         | channel 0-13               | Set mode
 start           | start                      | Begin TX
 stop            | stop                       | Halt TX

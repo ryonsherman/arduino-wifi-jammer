@@ -125,8 +125,8 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
 **Distribution Syntax:**
 - Format: `n@channel1,n@channel2,...`
 - Examples:
-  - `4@1,2@6,2@11,4@0` → 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 full spectrum
-  - `6@1,6@6` → 6 on ch1, 6 on ch6 (rest idle)
+  - `4@1,2@6,2@11` → 4 slaves on ch1, 2 on ch6, 2 on ch11 (rest idle)
+  - `6@1,6@6` → 6 on ch1, 6 on ch6
   - `12@6` → all 12 on ch6
   - `4@1,2@6` → 4 on ch1, 2 on ch6 (8 idle)
 
@@ -174,7 +174,7 @@ Distributed transmitter nodes controlled by master.
 1. Set desired mode:
    - Single channel: `channel 6`
    - Full spectrum: `channel 0`
-   - Custom: `set 4@1,2@6,2@11,4@0`
+   - Custom: `set 4@1,2@6,2@11`
 2. Check configuration: `status`
 3. Verify slave responses
 
@@ -192,27 +192,26 @@ Distributed transmitter nodes controlled by master.
 
 The following examples show the expected `status` command output for each mode:
 
-### 1. Custom Distribution Mode (`set 4@1,2@6,2@11,4@0`)
+### 1. Custom Distribution Mode (`set 4@1,2@6,2@11,4@1`)
 ```
 === Slave Status ===
 Active: 12/12
-Channel 1: 4
-Channel 6: 2
-Channel 11: 2
+Idle: 0
+Channels: 1,6,11
 === Channel Distribution ===
 Mode: Custom Distribution
-Slave 1 [ACTIVE] Channel: 1 (2415 MHz)
-Slave 2 [ACTIVE] Channel: 1 (2415 MHz)
-Slave 3 [ACTIVE] Channel: 1 (2415 MHz)
-Slave 4 [ACTIVE] Channel: 1 (2415 MHz)
-Slave 5 [ACTIVE] Channel: 6 (2420 MHz)
-Slave 6 [ACTIVE] Channel: 6 (2420 MHz)
-Slave 7 [ACTIVE] Channel: 11 (2475 MHz)
-Slave 8 [ACTIVE] Channel: 11 (2475 MHz)
-Slave 9 [ACTIVE] Channel: Full (2415 MHz)
-Slave 10 [ACTIVE] Channel: Full (2415 MHz)
-Slave 11 [ACTIVE] Channel: Full (2415 MHz)
-Slave 12 [ACTIVE] Channel: Full (2415 MHz)
+Slave 1 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 2 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 3 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 4 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 5 [ACTIVE] Channel: 6 (2437 MHz)
+Slave 6 [ACTIVE] Channel: 6 (2437 MHz)
+Slave 7 [ACTIVE] Channel: 11 (2462 MHz)
+Slave 8 [ACTIVE] Channel: 11 (2462 MHz)
+Slave 9 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 10 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 11 [ACTIVE] Channel: 1 (2412 MHz)
+Slave 12 [ACTIVE] Channel: 1 (2412 MHz)
 ```
 
 ### 2. Single Channel Mode (`channel 6`)
@@ -262,19 +261,20 @@ Slave 12 -> Freq 2470 (2470 MHz)
 ### Single Channel Mode
 All slaves transmit on exact channel frequency:
 ```cpp
-if (channel == 1) target = 2412;  // MHz
-else if (channel == 6) target = 2437;
-else if (channel == 11) target = 2462;
-else if (channel == 13) target = 2472;
-else target = 2412;  // default
+// offset = 2400 + 12 + (ch - 1) * 5
+// ch 1  -> 2412 MHz
+// ch 6  -> 2437 MHz
+// ch 11 -> 2462 MHz
+// ch 13 -> 2472 MHz
+uint8_t freq = 12 + (channel - 1) * 5;
 ```
 
 ### Full Spectrum Mode
 Slaves spread at 5MHz intervals:
 ```cpp
-double step = 60.0 / 12.0;  // 5.0 MHz spacing
-target = 2412 + 3 + (slave_id * step);
-// Slaves hit: 2415, 2420, 2425, 2430, 2435, 2440, 2445, 2450, 2455, 2460, 2465, 2470
+uint8_t freq = 15 + slave_id * 5;
+// Slaves hit: 2415, 2420, 2425, 2430, 2435, 2440,
+//             2445, 2450, 2455, 2460, 2465, 2470
 ```
 
 ### Range Validation
