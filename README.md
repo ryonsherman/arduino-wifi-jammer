@@ -97,7 +97,6 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
 - **Custom Mode**: Flexible per-slave channel assignment
 
 ### Power Configuration
-- **Master**: Low power RX mode (future spectrum analysis)
 - **Slaves**: Max output power TX for jamming
 - **Data Rate**: 2Mbps for fast transmission
 
