@@ -149,26 +149,70 @@ All nodes share the same SDA and SCL lines (parallel bus)
 ```
 
 
-## Power Distribution
+## NRF24L01+ Decoupling Capacitors
+
+Place a 10uF + 0.1uF capacitor pair as close as possible to each NRF24L01+ module's VCC/GND pins.
 
 ```
-        +---------------+
-        |  Power Source |
-        | (USB/Battery) |
-        +-------+-------+
-                |
-        +-------+-------+
-        |               |
-    +---+----+      +---+----+
-    | Master |      | Slaves |
-    |  0x70  |      | S0-S11 |
-    +--------+      +--------+
-        |               |
-  +-----+-----+   +-----+-----+
-  |    GND    |   |    GND    |
-  +-----------+   +-----------+
+         NRF24L01+ MODULE
+    +-----------------------+
+    |                       |
+    |  VCC o----+-----------+--- 3.3V rail
+    |           |
+    |          +-+
+    |          | | 10uF (electrolytic / tantalum)
+    |          | |  (+ side to VCC)
+    |          +-+
+    |           |
+    |          +-+
+    |          | | 0.1uF (ceramic)
+    |          | |
+    |          +-+
+    |           |
+    |  GND o----+-----------+--- GND rail
+    |                       |
+    +-----------------------+
 
-All nodes must share common ground
+    Notes:
+    - 10uF = bulk decoupling (handles sudden current draws during TX)
+    - 0.1uF = high-frequency noise suppression
+    - Place capacitors as close to module pins as possible
+    - Keep leads short — long wires reduce effectiveness
+```
+
+## Power Distribution
+
+For battery-powered operation, use a 9V battery → buck converter → 5V rail → 100uF bulk cap.
+
+```
+     +-----+         +-------------------+         +-----------+
+     | 9V  |         |   Buck Converter  |         |  100uF    |
+     | Bat |---------|  (step-down)      |---------| Electrolyt|----- 5V rail
+     |     | 9V in   |  5V out, 3A max  |  5V out |  (+ to 5V)| 
+     +-----+         +-------------------+         +-----------+     
+                                                        |
+                                                       === GND
+
+                     5V RAIL
+    +------------------+------------------+------------------+
+    |                  |                  |                  |
+ +--+--------+    +----+-------+    +-----+-------+    +----+------+
+ |  Master   |    |  Slave #0  |    |  Slave #1   |    | Slave #11 |
+ |  Arduino  |    | MH-Tiny    |    |  MH-Tiny    |    | MH-Tiny   |
+ |  Nano     |    | + NRF24    |    |  + NRF24    |    | + NRF24   |
+ |  5V pin   |    | 5V input   |    |  5V input   |    | 5V input  |
+ +-----------+    +------------+    +-------------+    +-----------+
+    |                  |                  |                  |
+    +------------------+------------------+------------------+
+                           GND RAIL (common ground)
+
+
+    Notes:
+    - Buck converter: adjust output to 5V before connecting
+    - 100uF cap: bulk decoupling at the power entry point
+    - Each NRF24 module also needs its own 10uF + 0.1uF near VCC
+    - 1A+ supply recommended for all 13 nodes
+    - Keep power wires short and use thick gauge for the 5V rail
 ```
 
 
