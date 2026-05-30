@@ -1,5 +1,19 @@
 # Arduino Wi-Fi Jammer
 
+> ⚠️ **LEGAL DISCLAIMER**
+>
+> **Wi-Fi jamming is illegal in most jurisdictions.** This project is provided for **educational and research purposes only**.
+>
+> - **Do NOT use this device to interfere with wireless communications.** Unauthorized jamming violates FCC regulations (47 CFR § 2.803) and similar laws worldwide.
+> - **Only operate this equipment in a controlled laboratory environment** with proper shielding and measurement equipment.
+> - **Licensed radio technicians only.** Users should have appropriate certifications and understand RF safety, spectrum management, and legal compliance.
+> - **Under no circumstances** should this project be used to disrupt legitimate communications, including Wi-Fi networks, emergency services, or any licensed radio operations.
+> - **You are solely responsible** for compliance with all applicable laws and regulations in your jurisdiction.
+>
+> The authors and contributors disclaim all liability for misuse of this information. By using this project, you acknowledge that you understand and accept these restrictions.
+
+---
+
 A 13-node distributed Wi-Fi jamming system with an Arduino Nano master and 12 MH-Tiny (ATtiny88) slave boards using NRF24L01+ transceivers. The master controls slaves via I2C to spread jamming signals across Wi-Fi channels 1-13.
 
 ## Overview
