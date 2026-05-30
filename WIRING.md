@@ -2,32 +2,35 @@
 
 ## System Overview
 
-                      MASTER NODE
-            (Arduino Nano + NRF24L01+)
-            I2C Address: 0x70
-            NRF24 Mode: RX
+```
+                    MASTER NODE
+          (Arduino Nano + NRF24L01+)
+          I2C Address: 0x70
+          NRF24 Mode: RX
 
-            USB ---> Serial Monitor (115200 baud)
+          USB ---> Serial Monitor (115200 baud)
 
-            SDA ----+---------------------------+
-            SCL ----+---------------------------+
-            VCC ----+---------------------------+
-            GND ----+---------------------------+
-                    |                           |
-                    |         I2C BUS           |
-                    |    (SDA/SCL parallel)     |
-                    |                           |
-      +----------+    +----------+    +----------+
-      |          |    |          |    |          |
-  +---+----------+----+----------+----+----------+---+
-  |  MH-TINY    |    |  MH-TINY  |    |  MH-TINY  |
-  |  SLAVE #0   |    |  SLAVE #1 |    |  SLAVE #11|
-  |  0x01       |    |  0x02     |    |  0x0C     |
-  +-------------+    +-----------+    +-----------+
+          SDA ----+---------------------------+
+          SCL ----+---------------------------+
+          VCC ----+---------------------------+
+          GND ----+---------------------------+
+                  |                           |
+                  |         I2C BUS           |
+                  |    (SDA/SCL parallel)     |
+                  |                           |
+    +----------+    +----------+    +----------+
+    |          |    |          |    |          |
++---+----------+----+----------+----+----------+---+
+|  MH-TINY    |    |  MH-TINY  |    |  MH-TINY  |
+|  SLAVE #0   |    |  SLAVE #1 |    |  SLAVE #11|
+|  0x01       |    |  0x02     |    |  0x0C     |
++-------------+    +-----------+    +-----------+
+```
 
 
 ## Master Node (0x70)
 
+```
 +---------------------------------------------+
 |              ARDUINO NANO                    |
 |                                              |
@@ -54,6 +57,7 @@
 |   RX   ------------------------ USB RX       |
 |   GND  ------------------------ USB GND      |
 +---------------------------------------------+
+```
 
 
 ## Slave Nodes (0x01-0x0C)
@@ -61,6 +65,7 @@
 The slaves use MH-Tiny ATtiny88 clones (TQFP-32) with ATTinyCore board package.
 Pin numbers below are Arduino-logical (mapped by ATTinyCore).
 
+```
 +---------------------------------------------+
 |            MH-TINY (ATTINY88)                |
 |                                              |
@@ -86,21 +91,24 @@ Pin numbers below are Arduino-logical (mapped by ATTinyCore).
 |   #define SLAVE_ID X (X = 0-11)             |
 |   I2C Address = 0x01 + SLAVE_ID             |
 +---------------------------------------------+
+```
 
 
 ## I2C Bus Topology
 
-                         MASTER (0x70)
-                             |
-       +---------------------+----------------------+
-       |                     |                      |
-    +--+--------+       +----+-------+        +-----+-------+
-    | MH-TINY   |       |  MH-TINY   |        |  MH-TINY    |
-    | SLAVE #0  |       |  SLAVE #1  |        |  SLAVE #11  |
-    | 0x01      |       |  0x02      |        |  0x0C       |
-    +-----------+       +------------+        +-------------+
+```
+                    MASTER (0x70)
+                        |
+  +---------------------+----------------------+
+  |                     |                      |
++--+--------+       +---+---------+       +----+--------+
+| MH-TINY   |       |  MH-TINY    |       |  MH-TINY    |
+| SLAVE #0  |       |  SLAVE #1   |       |  SLAVE #11  |
+| 0x01      |       |  0x02       |       |  0x0C       |
++-----------+       +-------------+       +-------------+
 
-    All nodes share the same SDA and SCL lines (parallel bus)
+All nodes share the same SDA and SCL lines (parallel bus)
+```
 
 
 ## Wiring Table
@@ -120,6 +128,7 @@ Pin numbers below are Arduino-logical (mapped by ATTinyCore).
 
 ## NRF24L01+ Module Pinout
 
+```
 +--------------------------------------------+
 |          NRF24L01+ MODULE                  |
 |                                            |
@@ -134,33 +143,36 @@ Pin numbers below are Arduino-logical (mapped by ATTinyCore).
 |   IRQ   ----+ (optional, unused)           |
 |                                            |
 |   Antenna ---+-----------------------------+
-|                                              |
-|   Notes:                                     |
-|   - VCC MUST be 3.3V (not 5V!)               |
-|   - Add capacitor 10uF + 0.1uF near VCC/GND |
-|   - Keep antenna away from digital lines    |
+|                                            |
+|   Notes:                                   |
+|   - VCC MUST be 3.3V (not 5V!)            |
+|   - Add capacitor 10uF + 0.1uF near VCC   |
+|   - Keep antenna away from digital lines  |
 +--------------------------------------------+
+```
 
 
 ## Power Distribution
 
-            +---------------+
-            |  Power Source |
-            | (USB/Battery) |
-            +-------+-------+
-                    |
-            +-------+-------+
-            |               |
-         +--+--+       +----+----+
-         |Mstr |       | Slaves |
-         |0x70|       | S0-S11  |
-         +--+--+       +----+----+
-            |               |
-      +-----+-----+   +-----+-----+
-      |   GND     |   |   GND     |
-      +-----------+   +-----------+
+```
+        +---------------+
+        |  Power Source |
+        | (USB/Battery) |
+        +-------+-------+
+                |
+        +-------+-------+
+        |               |
+     +--+---+       +---+----+
+     |Mstr  |       | Slaves |
+     | 0x70 |       | S0-S11 |
+     +------+       +--------+
+        |               |
+  +-----+-----+   +-----+-----+
+  |   GND     |   |   GND     |
+  +-----------+   +-----------+
 
-    All nodes must share common ground
+All nodes must share common ground
+```
 
 
 ## Current Requirements
