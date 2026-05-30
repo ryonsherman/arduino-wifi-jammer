@@ -57,9 +57,11 @@ Alternatively, **Digispark (ATtiny85)** with USI 2-pin SPI mod (limited to 2 sla
 - **NRF24L01+ Pins** (Arduino Nano):
   - CE: Pin 9
   - CSN: Pin 10
-  - VCC: 3.3V (critical!)
+  - VCC: 5V (if using a breakout board with onboard 3.3V regulator) **or** 3.3V (bare module)
   - GND: Common ground
   - MOSI, MISO, SCK: SPI bus
+
+  > **Note on NRF24 power:** Most NRF24L01+ breakout boards (with PCB antenna and extra components) include an onboard 3.3V LDO regulator and decoupling capacitors. These **accept 5V input**, which is convenient when using MH-Tiny slaves (which lack an onboard 3.3V regulator). Bare NRF24 modules without a breakout board need a clean 3.3V supply. Check your module's markings to confirm.
 
 ## USB-to-Serial Driver (CH340)
 
@@ -369,69 +371,166 @@ Distributed transmitter nodes controlled by master.
 
 The following examples show the expected `status` command output for each mode:
 
-### 1. Custom Distribution Mode (`set 4@1,2@6,2@11,4@1`)
+### 1. Single Channel Mode (`channel 6`, then `start`)
 ```
-=== Slave Status ===
-Active: 12/12
-Idle: 0
-Channels: 1,6,11
-=== Channel Distribution ===
-Mode: Custom Distribution
-Slave 1 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 2 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 3 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 4 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 5 [ACTIVE] Channel: 6 (2437 MHz)
-Slave 6 [ACTIVE] Channel: 6 (2437 MHz)
-Slave 7 [ACTIVE] Channel: 11 (2462 MHz)
-Slave 8 [ACTIVE] Channel: 11 (2462 MHz)
-Slave 9 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 10 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 11 [ACTIVE] Channel: 1 (2412 MHz)
-Slave 12 [ACTIVE] Channel: 1 (2412 MHz)
-```
-
-### 2. Single Channel Mode with Fan-Out (`channel 6`)
-```
-=== Slave Status ===
+=== Status ===
 Active: 12/12
 Channel: 6
-=== Channel Distribution ===
-Mode: Single Channel (Fan-Out)
-Slave 1 -> Channel 6 (2426 MHz)
-Slave 2 -> Channel 6 (2428 MHz)
-Slave 3 -> Channel 6 (2430 MHz)
-Slave 4 -> Channel 6 (2432 MHz)
-Slave 5 -> Channel 6 (2434 MHz)
-Slave 6 -> Channel 6 (2436 MHz)
-Slave 7 -> Channel 6 (2438 MHz)
-Slave 8 -> Channel 6 (2440 MHz)
-Slave 9 -> Channel 6 (2442 MHz)
-Slave 10 -> Channel 6 (2444 MHz)
-Slave 11 -> Channel 6 (2446 MHz)
-Slave 12 -> Channel 6 (2448 MHz)
+Pattern: continuous
+
+-- Slaves --
+  #1 0x01 CH  6  [OK] 12us
+  #2 0x02 CH  6  [OK] 12us
+  #3 0x03 CH  6  [OK] 12us
+  #4 0x04 CH  6  [OK] 12us
+  #5 0x05 CH  6  [OK] 12us
+  #6 0x06 CH  6  [OK] 12us
+  #7 0x07 CH  6  [OK] 12us
+  #8 0x08 CH  6  [OK] 12us
+  #9 0x09 CH  6  [OK] 12us
+  #10 0x0A CH  6  [OK] 12us
+  #11 0x0B CH  6  [OK] 12us
+  #12 0x0C CH  6  [OK] 12us
+12/12 online
+
+=== Frequency Map ===
+Mode: Single Ch 6
+S0: 2426 MHz
+S1: 2428 MHz
+S2: 2430 MHz
+S3: 2432 MHz
+S4: 2434 MHz
+S5: 2436 MHz
+S6: 2438 MHz
+S7: 2440 MHz
+S8: 2442 MHz
+S9: 2444 MHz
+S10: 2446 MHz
+S11: 2448 MHz
 ```
 Note: Slaves spread across the 22MHz channel width at 2MHz intervals for complete coverage.
 
-### 3. Full Spectrum Mode (`channel 0`)
+### 2. Full Spectrum Mode (`channel 0`, then `start`)
 ```
-=== Slave Status ===
+=== Status ===
 Active: 12/12
-Channel: All
-=== Channel Distribution ===
+Channel: All (spectrum)
+Pattern: continuous
+
+-- Slaves --
+  #1 0x01 CH 14  [OK] 12us
+  #2 0x02 CH 19  [OK] 12us
+  #3 0x03 CH 24  [OK] 12us
+  #4 0x04 CH 29  [OK] 12us
+  #5 0x05 CH 34  [OK] 12us
+  #6 0x06 CH 39  [OK] 12us
+  #7 0x07 CH 44  [OK] 12us
+  #8 0x08 CH 49  [OK] 12us
+  #9 0x09 CH 54  [OK] 12us
+  #10 0x0A CH 59  [OK] 12us
+  #11 0x0B CH 64  [OK] 12us
+  #12 0x0C CH 69  [OK] 12us
+12/12 online
+
+=== Frequency Map ===
 Mode: Full Spectrum
-Slave 1 -> Freq 2415 (2415 MHz)
-Slave 2 -> Freq 2420 (2420 MHz)
-Slave 3 -> Freq 2425 (2425 MHz)
-Slave 4 -> Freq 2430 (2430 MHz)
-Slave 5 -> Freq 2435 (2435 MHz)
-Slave 6 -> Freq 2440 (2440 MHz)
-Slave 7 -> Freq 2445 (2445 MHz)
-Slave 8 -> Freq 2450 (2450 MHz)
-Slave 9 -> Freq 2455 (2455 MHz)
-Slave 10 -> Freq 2460 (2460 MHz)
-Slave 11 -> Freq 2465 (2465 MHz)
-Slave 12 -> Freq 2470 (2470 MHz)
+S0: 2414 MHz
+S1: 2419 MHz
+S2: 2424 MHz
+S3: 2429 MHz
+S4: 2434 MHz
+S5: 2439 MHz
+S6: 2444 MHz
+S7: 2449 MHz
+S8: 2454 MHz
+S9: 2459 MHz
+S10: 2464 MHz
+S11: 2469 MHz
+```
+
+### 3. Custom Distribution Mode (`set 4@1,2@6,2@11,4@1`, then `start`)
+```
+=== Status ===
+Active: 12/12
+Channels: 1,6,11
+Pattern: continuous
+
+-- Slaves --
+  #1 0x01 CH  1  [OK] 12us
+  #2 0x02 CH  1  [OK] 12us
+  #3 0x03 CH  1  [OK] 12us
+  #4 0x04 CH  1  [OK] 12us
+  #5 0x05 CH  6  [OK] 12us
+  #6 0x06 CH  6  [OK] 12us
+  #7 0x07 CH 11  [OK] 12us
+  #8 0x08 CH 11  [OK] 12us
+  #9 0x09 CH  1  [OK] 12us
+  #10 0x0A CH  1  [OK] 12us
+  #11 0x0B CH  1  [OK] 12us
+  #12 0x0C CH  1  [OK] 12us
+12/12 online
+
+=== Frequency Map ===
+Mode: Custom
+S0: 2409 MHz
+S1: 2411 MHz
+S2: 2413 MHz
+S3: 2415 MHz
+S4: 2434 MHz
+S5: 2436 MHz
+S6: 2438 MHz
+S7: 2440 MHz
+S8: 2459 MHz
+S9: 2461 MHz
+S10: 2463 MHz
+S11: 2465 MHz
+```
+
+### 4. Sweep Mode (`sweep start`)
+```
+=== Status ===
+Active: 12/12
+Sweep ch1
+Mode: Sweep
+Pattern: continuous
+
+-- Slaves --
+  #1 0x01 CH  1  [OK] 12us
+  #2 0x02 CH  1  [OK] 12us
+  #3 0x03 CH  1  [OK] 12us
+  #4 0x04 CH  1  [OK] 12us
+  #5 0x05 CH  1  [OK] 12us
+  #6 0x06 CH  1  [OK] 12us
+  #7 0x07 CH  1  [OK] 12us
+  #8 0x08 CH  1  [OK] 12us
+  #9 0x09 CH  1  [OK] 12us
+  #10 0x0A CH  1  [OK] 12us
+  #11 0x0B CH  1  [OK] 12us
+  #12 0x0C CH  1  [OK] 12us
+12/12 online
+
+=== Frequency Map ===
+Mode: Sweep ch1, dwell 200ms
+All slaves sweeping ch1-13, currently ch1
+```
+Note: All 12 slaves sweep through channels 1-13 together. The channel shown updates every dwell period.
+
+### 5. Hardware Switch Active (position 3 — sweep)
+```
+=== Status ===
+Active: 12/12
+Sweep ch1
+Switch: SWEEP (position 3)
+Pattern: continuous
+
+-- Slaves --
+  #1 0x01 CH  1  [OK] 12us
+  ...
+12/12 online
+
+=== Frequency Map ===
+Mode: Sweep ch1, dwell 200ms
+All slaves sweeping ch1-13, currently ch1
 ```
 
 ## Frequency Calculations
