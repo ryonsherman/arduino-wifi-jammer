@@ -109,7 +109,7 @@ Examples:
   `channel 1`        -> All slaves on channel 1 (2412 MHz)
 
   `channel 13`       -> All slaves on channel 13 (2472 MHz)
-  
+
   `channel 0`        -> Full spectrum (slaves spread across 60MHz span)
 
 Frequency Mapping:
@@ -385,7 +385,9 @@ status          | status                     | Show distribution
 
 ### Mode Values
 0 = Full Spectrum (spread 60MHz)
+
 1 = Single Channel (all on one freq)
+
 3 = Custom Distribution (flexible)
 
 
