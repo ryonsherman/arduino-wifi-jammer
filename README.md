@@ -437,9 +437,9 @@ if (target > 2527) target = 2527;
 ```
 wifi-jammer/
 ├── Master_Controller/
-│   └── Master_Controller.ino        # Master firmware (Arduino Nano)
+│   └── Master_Controller.ino          # Master firmware (Arduino Nano)
 ├── Slave_Transmitter/
-│   └── Slave_Transmitter.ino        # Slave firmware (ATtiny88 + NRFLite)
+│   └── Slave_Transmitter.ino          # Slave firmware (ATtiny88 + NRFLite)
 ├── pcb/
 │   ├── master/                        # Master + Power board KiCad project
 │   └── slave/                         # Slave carrier board KiCad project
