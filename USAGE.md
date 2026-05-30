@@ -22,32 +22,32 @@ This guide provides quick reference for all master controller commands. Open USB
 
 Display all available commands and usage examples.
 
-Usage: help
+Usage: `help`
 
 Output:
   Command List:
-  - help: Show command list
-  - get [ids]: Query slave configs (e.g., get 0,1,2 or get all)
-  - set <dist>: Set custom distribution (e.g., set 4@1,2@6,2@11)
-  - channel <n>: Set single channel (1-13) or full spectrum (0)
-  - start: Begin transmitting
-  - stop: Halt transmission
-  - status: Show slave distribution and frequency map
+  - `help`: Show command list
+  - `get [ids]`: Query slave configs (e.g., `get 0,1,2` or `get all`)
+  - `set <dist>`: Set custom distribution (e.g., `set 4@1,2@6,2@11`)
+  - `channel <n>`: Set single channel (1-13) or full spectrum (0)
+  - `start`: Begin transmitting
+  - `stop`: Halt transmission
+  - `status`: Show slave distribution and frequency map
 
 
 ### 2. get [ids]
 
 Query configuration of specific slaves or all slaves.
 
-Usage: get [ids]
+Usage: `get [ids]`
 - ids: Comma-separated slave IDs (0-11) or "all"
 - If omitted, shows all slaves
 
 Examples:
-  get              -> Show all 12 slaves
-  get 0,1,2        -> Show slaves 0, 1, 2
-  get 3,5,7,9      -> Show slaves 3, 5, 7, 9
-  get all          -> Show all slaves (explicit)
+  `get`              -> Show all 12 slaves
+  `get 0,1,2`        -> Show slaves 0, 1, 2
+  `get 3,5,7,9`      -> Show slaves 3, 5, 7, 9
+  `get all`          -> Show all slaves (explicit)
 
 Output Format:
   === Slave Status ===
@@ -62,33 +62,33 @@ Output Format:
 
 Configure custom channel distribution pattern.
 
-Usage: set <distribution>
-- Format: n@channel1,n@channel2,...
+Usage: `set <distribution>`
+- Format: `n@channel1,n@channel2,...`
 - n = number of slaves to assign to channel
 - channel = Wi-Fi channel (1-13) or 0 for full spectrum
 - Unspecified slaves become idle
 
 Examples:
-  set 4@1,2@6,2@11,4@0
+  `set 4@1,2@6,2@11,4@0`
      -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 in full spectrum mode
      -> All 12 slaves active
 
-  set 6@1,6@6
+  `set 6@1,6@6`
      -> 6 slaves on ch1, 6 on ch6
      -> 8 slaves become idle
 
-  set 12@6
+  `set 12@6`
      -> All 12 slaves on channel 6
 
-  set 4@1,2@6
+  `set 4@1,2@6`
      -> 4 slaves on ch1, 2 on ch6
      -> 6 slaves become idle
 
-  set 3@1,3@6,3@11,3@0
+  `set 3@1,3@6,3@11,3@0`
      -> Balanced distribution across 3 channels + full spectrum
 
 Distribution Syntax Rules:
-- Use comma to separate groups: 4@1,2@6
+- Use comma to separate groups: `4@1,2@6`
 - Channel range: 1-13 or 0 (full spectrum)
 - Total slaves must not exceed 12
 - Slaves not assigned become idle (not transmitting)
@@ -98,14 +98,14 @@ Distribution Syntax Rules:
 
 Set single channel mode or full spectrum mode.
 
-Usage: channel <n>
+Usage: `channel <n>`
 - n = channel number (1-13) or 0 for full spectrum
 
 Examples:
-  channel 6        -> All slaves on channel 6 (2420 MHz)
-  channel 1        -> All slaves on channel 1 (2412 MHz)
-  channel 13       -> All slaves on channel 13 (2472 MHz)
-  channel 0        -> Full spectrum (slaves spread across 60MHz span)
+  `channel 6`        -> All slaves on channel 6 (2420 MHz)
+  `channel 1`        -> All slaves on channel 1 (2412 MHz)
+  `channel 13`       -> All slaves on channel 13 (2472 MHz)
+  `channel 0`        -> Full spectrum (slaves spread across 60MHz span)
 
 Frequency Mapping:
 - Channel 1:  2412 MHz
@@ -119,7 +119,7 @@ Frequency Mapping:
 
 Begin transmission with current configuration.
 
-Usage: start
+Usage: `start`
 
 Behavior:
 - Activates all active slaves
@@ -128,8 +128,8 @@ Behavior:
 - Master enters command loop
 
 Notes:
-- Configuration persists after stop
-- Use 'stop' before 'start' to reapply new settings
+- Configuration persists after `stop`
+- Use `stop` before `start` to reapply new settings
 - All active slaves transmit simultaneously
 
 
@@ -137,17 +137,17 @@ Notes:
 
 Halt transmission but keep configuration.
 
-Usage: stop
+Usage: `stop`
 
 Behavior:
-- Sends stop command to all slaves via I2C
+- Sends `stop` command to all slaves via I2C
 - Slaves enter idle state
 - Configuration (mode, channels) retained
-- Fast restart with 'start' command
+- Fast restart with `start` command
 
 Notes:
 - Does NOT reset configuration
-- Use 'set' or 'channel' to change settings
+- Use `set` or `channel` to change settings
 - Physical restart (power cycle) clears config
 
 
@@ -155,7 +155,7 @@ Notes:
 
 Show current slave distribution and frequency map.
 
-Usage: status
+Usage: `status`
 
 Output Sections:
 
@@ -192,15 +192,15 @@ Example Output:
 All active slaves transmit on the same channel frequency.
 Best for: Maximum power density on one channel
 
-Usage: channel <1-13>
-Example: channel 6 -> All slaves on 2427 MHz
+Usage: `channel <1-13>`
+Example: `channel 6` -> All slaves on 2427 MHz
 
 ### FULL SPECTRUM MODE
 
 Slaves spread across 60MHz span (2415-2470 MHz).
 Best for: Wide coverage across multiple channels
 
-Usage: channel 0
+Usage: `channel 0`
 Frequency distribution:
   Slave 1: 2415 MHz
   Slave 2: 2420 MHz
@@ -213,8 +213,8 @@ Frequency distribution:
 Flexible assignment of slaves to specific channels.
 Best for: Targeted jamming of specific channels
 
-Usage: set <distribution>
-Example: set 4@1,2@6,2@11,4@0
+Usage: `set <distribution>`
+Example: `set 4@1,2@6,2@11,4@0`
   -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 in full spectrum
 
 
@@ -222,39 +222,39 @@ Example: set 4@1,2@6,2@11,4@0
 
 ### Example 1: Single Channel Jamming
 1. Connect to master via USB serial (115200 baud)
-2. Type: channel 6
-3. Type: status
-4. Type: start
+2. Type: `channel 6`
+3. Type: `status`
+4. Type: `start`
 5. All 12 slaves transmit on channel 6
 
 ### Example 2: Full Spectrum Coverage
-1. Type: channel 0
-2. Type: status
-3. Type: start
+1. Type: `channel 0`
+2. Type: `status`
+3. Type: `start`
 4. Slaves spread across 2415-2470 MHz
 
 ### Example 3: Targeted Multi-Channel
-1. Type: set 4@1,4@6,4@11
-2. Type: status
-3. Type: start
+1. Type: `set 4@1,4@6,4@11`
+2. Type: `status`
+3. Type: `start`
 4. 4 slaves each on channels 1, 6, and 11
 
 ### Example 4: Stop and Restart
-1. Type: stop (slaves idle, config retained)
-2. Type: channel 11 (change to channel 11)
-3. Type: status
-4. Type: start (restart on new channel)
+1. Type: `stop` (slaves idle, config retained)
+2. Type: `channel 11` (change to channel 11)
+3. Type: `status`
+4. Type: `start` (restart on new channel)
 
 ### Example 5: Reset to Full Spectrum
-1. Type: stop
-2. Type: set 12@0
-3. Type: start
+1. Type: `stop`
+2. Type: `set 12@0`
+3. Type: `start`
 4. All 12 slaves in full spectrum mode
 
 ### Example 6: Partial Deployment
-1. Type: set 6@1,6@6
-2. Type: status
-3. Type: start
+1. Type: `set 6@1,6@6`
+2. Type: `status`
+3. Type: `start`
 4. 6 slaves on ch1, 6 on ch6, 6 idle
 
 
@@ -328,8 +328,8 @@ channel 0
 
 Issue: "Slave Not Found"
 Solution:
-- Check I2C wiring (SDA=A4, SCL=A5)
-- Verify slave address (0x01-0x0C)
+- Check I2C wiring (`SDA=A4`, `SCL=A5`)
+- Verify slave address (`0x01`-`0x0C`)
 - Ensure common ground
 - Check NRF24L01+ VCC (3.3V critical)
 
@@ -337,7 +337,7 @@ Issue: "Active: X/12" (fewer than 12)
 Solution:
 - Verify all slaves powered
 - Check I2C connections on all nodes
-- Verify SLAVE_ID set correctly (0-11)
+- Verify `SLAVE_ID` set correctly (0-11)
 - Ensure no duplicate addresses
 
 Issue: Frequency Drift
@@ -348,13 +348,13 @@ Solution:
 
 Issue: Config Not Persisting
 Solution:
-- Use 'stop' before power cycle
+- Use `stop` before power cycle
 - Configuration only resets on physical restart
-- Check current_mode variable not overwritten
+- Check `current_mode` variable not overwritten
 
-Issue: slaves not transmitting
+Issue: Slaves not transmitting
 Solution:
-- Verify 'start' command issued
+- Verify `start` command issued
 - Check mode and channel set correctly
 - Verify NRF24L01+ CE pin (Pin 9) connected
 - Check antenna attached
@@ -382,7 +382,7 @@ status          | status                     | Show distribution
 ## NOTES
 
 - All commands case-insensitive
-- Configuration persists after 'stop'
+- Configuration persists after `stop`
 - Physical restart required to clear config
 - Slaves numbered 1-12 in output (internal: 0-11)
 - Max frequency: 2527 MHz (NRF24L01+ limit)
