@@ -4,19 +4,24 @@
 
 ```
                     MASTER NODE
-                  (Arduino Nano)
-                I2C Address: 0x70
+          (Arduino Nano + NRF24L01+)
+          I2C Address: 0x70
+          NRF24 Mode: RX
 
-            USB ---> Serial Monitor (115200 baud)
+          USB ---> Serial Monitor (115200 baud)
 
+          SDA ---+----------------------------+
+          SCL ---+----------------------------+
+          VCC ---+----------------------------+
+          GND ---+----------------------------+
+                 |                            |
+                 |          I2C BUS           |
+                 |     (SDA/SCL parallel)     |
+                 |                            |
  +-----------+---+-----------+---+------------+---+------------+
  |  SLAVE #0 |   |  SLAVE #1 |   |  SLAVE #X  |   |  SLAVE #11 |
  |  0x01     |   |  0x02     |   |  ...       |   |  0x0C      |
  +-----------+   +-----------+   +------------+   +------------+
-            |                            |
-            |          I2C BUS           |
-            |     (SDA/SCL parallel)     |
-            +----------------------------+
 ```
 
 
@@ -25,6 +30,20 @@
 ```
 +----------------------------------------------+
 |              ARDUINO NANO                    |
+|                                              |
+|   +---------------------------------------+  |
+|   |           NRF24L01+ MODULE            |  |
+|   |                                       |  |  
+|   |   VCC  ----+--------------------------+  |
+|   |            | (3.3V critical!)         |  |
+|   |   GND  ----+--------------------------+  |
+|   |   CE   ----+------- Pin 9             |  |
+|   |   CSN  ----+------- Pin 10            |  |
+|   |   SCK  ----+------- Pin 13 (SPI SCK)  |  |
+|   |   MISO ----+------- Pin 12 (SPI MISO) |  |
+|   |   MOSI ----+------- Pin 11 (SPI MOSI) |  |
+|   |   IRQ  ----+------- (optional)        |  |
+|   +---------------------------------------+  |
 |                                              |
 |   I2C Connections:                           | 
 |   SDA  ------------------------ Pin A4       | 
@@ -97,6 +116,11 @@ All nodes share the same SDA and SCL lines (parallel bus)
 | SCL        | A5            | Pin 24 (PC5)     |
 | VCC        | 3.3V          | 3.3V             |
 | GND        | GND           | GND              |
+| CE         | Pin 9         | Pin 9  (PB1)     |
+| CSN        | Pin 10        | Pin 10 (PB2)     |
+| SCK        | Pin 13        | Pin 13 (PB5)     |
+| MOSI       | Pin 11        | Pin 11 (PB3)     |
+| MISO       | Pin 12        | Pin 12 (PB4)     |
 
 
 ## NRF24L01+ Module Pinout
@@ -155,6 +179,7 @@ All nodes must share common ground
 | Arduino Nano (master)| 50mA        | 20mA            |
 | MH-Tiny ATtiny88     | 10mA        | 5mA             |
 | NRF24L01+ TX mode    | 11.5mA      | 10mA            |
+| NRF24L01+ RX mode    | 14.5mA      | 12mA            |
 | **Total per Slave**  | ~62mA       | ~32mA           |
 | **Total System**     | ~806mA      | ~416mA          |
 
@@ -168,9 +193,9 @@ Pre-Flight Wiring Check:
 - [ ] NRF24L01+ VCC: 3.3V (direct to module) or 5V (if breakout has regulator)
 - [ ] SDA connected on all nodes (Nano A4, MH-Tiny Pin 23)
 - [ ] SCL connected on all nodes (Nano A5, MH-Tiny Pin 24)
-- [ ] Slave NRF24 CE pin (Pin 9) connected
-- [ ] Slave NRF24 CSN pin (Pin 10) connected
-- [ ] Slave SPI pins (11, 12, 13) connected
+- [ ] CE pin (9) connected on all nodes
+- [ ] CSN pin (10) connected on all nodes
+- [ ] SPI pins (11, 12, 13) connected on all nodes
 - [ ] Antenna attached to all NRF24L01+ modules
 - [ ] Master connected to USB serial
 - [ ] Power source capable of 1A+
