@@ -402,10 +402,8 @@ status          | status                     | Show distribution
 - Power requirement: 1A+ supply for 13 nodes
 
 
-## VERSION
+---
 
-Version: 1.0
-
-Last Updated: May 2026
-
-Author: Distributed System Team
+**Version**: 1.0  
+**Last Updated**: May 2026  
+**Author**: Ryon Sherman

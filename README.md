@@ -29,7 +29,7 @@ This system creates a coordinated jamming swarm that can:
 | Item | Quantity | Notes | Approx. Cost |
 |------|----------|-------|--------------|
 | Arduino Nano (master) | 1 | ~$15 for 3 units | ~$5 |
-| MH-Tiny ATtiny88 (slaves) | 12 | ~$22 for 10 | ~$27 |
+| MH-Tiny ATtiny88 (slaves) | 12 | ~$22 for 10 units | ~$27 |
 | NRF24L01+ module | 13 | Breakout board optional | ~$65 |
 | 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
@@ -363,4 +363,4 @@ This project is open source. Use freely for Wi-Fi jamming applications.
 
 **Version**: 1.0  
 **Last Updated**: May 2026  
-**Authors**: Distributed System Team
+**Author**: Ryon Sherman
