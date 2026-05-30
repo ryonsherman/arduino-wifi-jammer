@@ -104,20 +104,23 @@ Usage: `channel <n>`
 - n = channel number (1-13) or 0 for full spectrum
 
 Examples:
-  `channel 6`        -> All slaves on channel 6 (2420 MHz)
+  `channel 6`        -> All slaves spread across channel 6 (2426-2448 MHz)
 
-  `channel 1`        -> All slaves on channel 1 (2412 MHz)
+  `channel 1`        -> All slaves spread across channel 1 (2401-2423 MHz)
 
-  `channel 13`       -> All slaves on channel 13 (2472 MHz)
+  `channel 13`       -> All slaves spread across channel 13 (2461-2483 MHz)
 
   `channel 0`        -> Full spectrum (slaves spread across 60MHz span)
 
 Frequency Mapping:
-- Channel 1:  2412 MHz
-- Channel 6:  2427 MHz
-- Channel 11: 2462 MHz
-- Channel 13: 2472 MHz
-- Full Spectrum (0): 2415-2470 MHz (5MHz spacing)
+- Single Channel Mode uses **fan-out**: slaves spread across 22MHz channel width
+  - Formula: `center_freq + (slave_id * 2) - 11`
+  - Example: Channel 6 (center 2437 MHz) → Slaves cover 2426-2448 MHz
+- Channel 1 center:  2412 MHz → fan-out 2401-2423 MHz
+- Channel 6 center:  2437 MHz → fan-out 2426-2448 MHz
+- Channel 11 center: 2462 MHz → fan-out 2451-2473 MHz
+- Channel 13 center: 2472 MHz → fan-out 2461-2483 MHz
+- Full Spectrum (0): 2415-2470 MHz (5MHz spacing, no fan-out)
 
 
 ### 5. start
@@ -197,13 +200,17 @@ Slave 2 -> Freq 2420 (2420 MHz)
 
 ## MODES OVERVIEW
 
-### SINGLE CHANNEL MODE
+### SINGLE CHANNEL MODE (Fan-Out)
 
-All active slaves transmit on the same channel frequency.
-Best for: Maximum power density on one channel
+Slaves spread across the 22MHz channel width at 2MHz intervals.
+Best for: Complete coverage of a single Wi-Fi channel
 
 Usage: `channel <1-13>`
-Example: `channel 6` -> All slaves on 2427 MHz
+Example: `channel 6` -> Slaves spread 2426-2448 MHz (covering channel 6's full width)
+
+Fan-out formula: `center_freq + (slave_id * 2) - 11`
+- slave_id 0: center - 11 MHz
+- slave_id 11: center + 11 MHz
 
 ### FULL SPECTRUM MODE
 
@@ -226,16 +233,17 @@ Best for: Targeted jamming of specific channels
 Usage: `set <distribution>`
 Example: `set 4@1,2@6,2@11,4@6`
   -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 on ch6
+  -> Each channel uses fan-out for full width coverage
 
 
 ## USAGE EXAMPLES
 
-### Example 1: Single Channel Jamming
+### Example 1: Single Channel Jamming (with Fan-Out)
 1. Connect to master via USB serial (115200 baud)
 2. Type: `channel 6`
 3. Type: `status`
 4. Type: `start`
-5. All 12 slaves transmit on channel 6
+5. All 12 slaves spread across channel 6 (2426-2448 MHz)
 
 ### Example 2: Full Spectrum Coverage
 1. Type: `channel 0`
@@ -270,13 +278,15 @@ Example: `set 4@1,2@6,2@11,4@6`
 
 ## FREQUENCY TABLES
 
-### Wi-Fi Channel Frequencies (Single Channel Mode)
-Channel | Frequency (MHz) | Notes
---------|-----------------|------------------
-1       | 2412            | Common in US/EU
-6       | 2427            | Non-overlapping with 1,11
-11      | 2442            | Non-overlapping with 1,6
-13      | 2462            | EU only (US limit 11)
+### Wi-Fi Channel Frequencies (Single Channel Mode with Fan-Out)
+Channel | Center (MHz) | Fan-Out Range (MHz) | Notes
+--------|--------------|---------------------|------------------
+1       | 2412         | 2401-2423           | Common in US/EU
+6       | 2437         | 2426-2448           | Non-overlapping with 1,11
+11      | 2462         | 2451-2473           | Non-overlapping with 1,6
+13      | 2472         | 2461-2483           | EU only (US limit 11)
+
+Fan-out formula: `center + (slave_id * 2) - 11` where slave_id is 0-11
 
 ### Full Spectrum Mode Frequencies
 Slave   | Frequency (MHz) | Channel Approx
@@ -383,11 +393,11 @@ status          | status                     | Show distribution
 
 
 ### Mode Values
-0 = Full Spectrum (spread 60MHz)
+0 = Full Spectrum (spread 60MHz at 5MHz intervals)
 
-1 = Single Channel (all on one freq)
+1 = Single Channel (fan-out across 22MHz channel width at 2MHz intervals)
 
-3 = Custom Distribution (flexible)
+3 = Custom Distribution (flexible, uses fan-out within each channel)
 
 
 ## NOTES

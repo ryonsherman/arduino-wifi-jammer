@@ -89,21 +89,20 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
   - Byte 0: Mode (0=Full Spectrum, 1=Single Channel, 3=Custom)
   - Byte 1: Channel (1-13 or 0 for full spectrum)
   - Byte 2: Command (CMD_START=1, CMD_STOP=0)
-  - Byte 3: Padding (reserved)
+  - Byte 3: Slave ID (0-11) for fan-out frequency calculation
 
 ### Frequency Strategy
-- **Single Channel Mode**: All 12 slaves transmit on exact channel frequency
-  - Channel 1: 2412 MHz
-  - Channel 6: 2437 MHz
-  - Channel 11: 2462 MHz
-  - Channel 13: 2472 MHz
-  - Other channels: 5MHz spacing between channels
+- **Single Channel Mode (Fan-Out)**: 12 slaves spread across 22MHz channel width at 2MHz spacing
+  - Formula: `center_freq + (slave_id * 2) - 11` where slave_id is 0-11
+  - Example: Channel 6 (center 2437 MHz) → Slaves cover 2426-2448 MHz
+  - This blankets the entire channel width instead of all slaves hitting the same center frequency
+  - Channel centers: Ch 1 = 2412 MHz, Ch 6 = 2437 MHz, Ch 11 = 2462 MHz, Ch 13 = 2472 MHz
 
 - **Full Spectrum Mode**: 12 slaves spread across 60MHz at 5MHz spacing
   - Coverage: 2415, 2420, 2425...2470 MHz
   - Mid-channel positioning for maximum coverage
 
-- **Custom Mode**: Flexible per-slave channel assignment
+- **Custom Mode**: Flexible per-slave channel assignment (uses fan-out within each channel)
 
 ### Power Configuration
 - **Slaves**: Max output power TX for jamming
@@ -214,26 +213,27 @@ Slave 11 [ACTIVE] Channel: 1 (2412 MHz)
 Slave 12 [ACTIVE] Channel: 1 (2412 MHz)
 ```
 
-### 2. Single Channel Mode (`channel 6`)
+### 2. Single Channel Mode with Fan-Out (`channel 6`)
 ```
 === Slave Status ===
 Active: 12/12
 Channel: 6
 === Channel Distribution ===
-Mode: Single Channel
-Slave 1 -> Channel 6 (2420 MHz)
-Slave 2 -> Channel 6 (2420 MHz)
-Slave 3 -> Channel 6 (2420 MHz)
-Slave 4 -> Channel 6 (2420 MHz)
-Slave 5 -> Channel 6 (2420 MHz)
-Slave 6 -> Channel 6 (2420 MHz)
-Slave 7 -> Channel 6 (2420 MHz)
-Slave 8 -> Channel 6 (2420 MHz)
-Slave 9 -> Channel 6 (2420 MHz)
-Slave 10 -> Channel 6 (2420 MHz)
-Slave 11 -> Channel 6 (2420 MHz)
-Slave 12 -> Channel 6 (2420 MHz)
+Mode: Single Channel (Fan-Out)
+Slave 1 -> Channel 6 (2426 MHz)
+Slave 2 -> Channel 6 (2428 MHz)
+Slave 3 -> Channel 6 (2430 MHz)
+Slave 4 -> Channel 6 (2432 MHz)
+Slave 5 -> Channel 6 (2434 MHz)
+Slave 6 -> Channel 6 (2436 MHz)
+Slave 7 -> Channel 6 (2438 MHz)
+Slave 8 -> Channel 6 (2440 MHz)
+Slave 9 -> Channel 6 (2442 MHz)
+Slave 10 -> Channel 6 (2444 MHz)
+Slave 11 -> Channel 6 (2446 MHz)
+Slave 12 -> Channel 6 (2448 MHz)
 ```
+Note: Slaves spread across the 22MHz channel width at 2MHz intervals for complete coverage.
 
 ### 3. Full Spectrum Mode (`channel 0`)
 ```
@@ -258,15 +258,17 @@ Slave 12 -> Freq 2470 (2470 MHz)
 
 ## Frequency Calculations
 
-### Single Channel Mode
-All slaves transmit on exact channel frequency:
+### Single Channel Mode (Fan-Out)
+Slaves spread across the 22MHz channel width at 2MHz intervals:
 ```cpp
-// offset = 2400 + 12 + (ch - 1) * 5
-// ch 1  -> 2412 MHz
-// ch 6  -> 2437 MHz
-// ch 11 -> 2462 MHz
-// ch 13 -> 2472 MHz
-uint8_t freq = 12 + (channel - 1) * 5;
+// center_freq = 2400 + 12 + (ch - 1) * 5
+// fan-out = center_freq + (slave_id * 2) - 11
+// Example: Channel 6 (center 2437 MHz)
+//   slave_id 0  -> 2437 + (0 * 2) - 11 = 2426 MHz
+//   slave_id 5  -> 2437 + (5 * 2) - 11 = 2436 MHz
+//   slave_id 11 -> 2437 + (11 * 2) - 11 = 2448 MHz
+uint16_t center = 2412 + (channel - 1) * 5;
+uint16_t freq = center + (slave_id * 2) - 11;
 ```
 
 ### Full Spectrum Mode
@@ -355,7 +357,7 @@ arduino-cli core install ATTinyCore:avr
 ### Arduino Libraries
 
 ```sh
-# Install NRFLite library (Slave - ATtiny88 / ATtiny85)
+# Install NRFLite library (all units - Master & Slaves)
 arduino-cli lib install NRFLite
 ```
 
@@ -364,7 +366,7 @@ arduino-cli lib install NRFLite
 | Library | Used By | Built-in? |
 |---------|---------|-----------|
 | `Wire.h` | Master & Slave | Yes (via core) |
-| `NRFLite.h` (dparson55) | Slave | No — install above |
+| `NRFLite.h` v3.1.2 (dparson55) | Master & Slave | No — install above |
 
 ### NRF24L01+ Module
 - Supports 2.4GHz band
