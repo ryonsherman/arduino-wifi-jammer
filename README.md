@@ -1,5 +1,7 @@
 # Arduino Wi-Fi Jammer
 
+A 13-node distributed Wi-Fi jamming system with an Arduino Nano master and 12 MH-Tiny (ATtiny88) slave boards using NRF24L01+ transceivers. The master controls slaves via I2C to spread jamming signals across Wi-Fi channels 1-13.
+
 > ⚠️ **LEGAL DISCLAIMER**
 >
 > **Wi-Fi jamming is illegal in most jurisdictions.** This project is provided for **educational and research purposes only**.
@@ -13,8 +15,6 @@
 > The authors and contributors disclaim all liability for misuse of this information. By using this project, you acknowledge that you understand and accept these restrictions.
 
 ---
-
-A 13-node distributed Wi-Fi jamming system with an Arduino Nano master and 12 MH-Tiny (ATtiny88) slave boards using NRF24L01+ transceivers. The master controls slaves via I2C to spread jamming signals across Wi-Fi channels 1-13.
 
 ## Overview
 
