@@ -28,6 +28,12 @@ volatile bool jamming = false;
 volatile uint8_t current_mode = 0;
 volatile uint8_t current_channel = 0;
 
+// Pending command from I2C — applied in loop() to avoid SPI calls in interrupt context
+volatile bool pending_cfg = false;
+volatile uint8_t pending_mode = 0;
+volatile uint8_t pending_channel = 0;
+volatile uint8_t pending_cmd = 0;
+
 NRFLite radio;
 
 uint8_t calc_freq(uint8_t mode, uint8_t ch) {
@@ -46,23 +52,11 @@ void transmit_noise() {
 void receiveI2C(int byteCount) {
   if (byteCount != PACKET_SIZE) return;
 
-  uint8_t mode = Wire.read();
-  uint8_t ch = Wire.read();
-  uint8_t cmd = Wire.read();
+  pending_mode = Wire.read();
+  pending_channel = Wire.read();
+  pending_cmd = Wire.read();
   Wire.read();
-
-  current_mode = mode;
-  current_channel = ch;
-
-  if (cmd == 1) {
-    jamming = true;
-    uint8_t freq = calc_freq(mode, ch);
-    radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, freq);
-    Serial.println(F("[SLAVE] STARTED"));
-  } else {
-    jamming = false;
-    Serial.println(F("[SLAVE] STOPPED"));
-  }
+  pending_cfg = true;
 }
 
 void requestI2C() {
@@ -82,5 +76,19 @@ void setup() {
 }
 
 void loop() {
+  if (pending_cfg) {
+    pending_cfg = false;
+    current_mode = pending_mode;
+    current_channel = pending_channel;
+    if (pending_cmd == 1) {
+      jamming = true;
+      uint8_t freq = calc_freq(current_mode, current_channel);
+      radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, freq);
+      Serial.println(F("[SLAVE] STARTED"));
+    } else {
+      jamming = false;
+      Serial.println(F("[SLAVE] STOPPED"));
+    }
+  }
   if (jamming) transmit_noise();
 }

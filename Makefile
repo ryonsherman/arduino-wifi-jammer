@@ -8,7 +8,7 @@
 # make       = compile master + ATtiny88 slave
 # make tiny  = compile master + ATtiny85 slave
 # make upload-master PORT=/dev/cu.usbserial-XXXX
-# make upload-slave   (micronucleus — plug when prompted)
+# make upload-slave      (micronucleus — plug when prompted)
 # make upload-slave-tiny (micronucleus)
 
 ARDUINO_CLI = arduino-cli
