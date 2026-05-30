@@ -50,6 +50,32 @@ This system creates a coordinated jamming swarm that can:
   - GND: Common ground
   - MOSI, MISO, SCK: SPI bus
 
+## USB-to-Serial Driver (CH340)
+
+The MH-Tiny boards use a **CH340G** USB-to-serial chip. You may need to install a driver for your OS.
+
+### macOS
+
+1. Download `CH341SER_MAC.ZIP` from [wch.cn](https://www.wch.cn/download/CH341SER_MAC_ZIP.html)
+2. Unzip and run the `.pkg` installer
+3. If blocked: System Settings → Privacy & Security → click **Allow Anyway**
+4. Restart
+
+**Apple Silicon (M1+):** After install, enable the extension at:
+System Settings → General → Login Items & Extensions → Driver Extensions → toggle **CH34xVCPDriver** on
+
+Verify: `ls /dev/cu.wchusbserial*` should show a device when plugged in.
+
+### Windows
+
+Windows 10 and 11 include the CH340 driver automatically. If it doesn't appear:
+- Download from [wch.cn](https://www.wch.cn/download/CH341SER_EXE.html)
+- Run `CH341SER.EXE` and click **Install**
+
+### Linux
+
+Built into the kernel (CH341 driver since ~3.x). No installation needed. The device appears as `/dev/ttyUSB0` when plugged in.
+
 ## System Architecture
 
 ### Communication Protocol
