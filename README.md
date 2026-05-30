@@ -336,14 +336,37 @@ wifi-jammer/
 
 ## Dependencies
 
-### Arduino Libraries (Master — Arduino Nano)
-- `SPI.h` (built-in)
-- `Wire.h` (built-in)
-- `RF24.h` (TMRh20) — Install via `arduino-cli lib install RF24`
+### Arduino CLI & Platform Cores
 
-### Arduino Libraries (Slave — ATtiny88 / ATtiny85)
-- `Wire.h` (built-in via ATTinyCore)
-- `NRFLite.h` (dparson55) — Install via `arduino-cli lib install NRFLite`
+```sh
+# Install arduino-cli (macOS)
+brew install arduino-cli
+
+# Install AVR core (for Arduino Nano)
+arduino-cli core install arduino:avr
+
+# Install ATTinyCore (for ATtiny88 / ATtiny85)
+arduino-cli core install ATTinyCore:avr
+```
+
+### Arduino Libraries
+
+```sh
+# Install NRF24 library (Master - Arduino Nano)
+arduino-cli lib install RF24
+
+# Install NRFLite library (Slave - ATtiny88 / ATtiny85)
+arduino-cli lib install NRFLite
+```
+
+### Libraries Reference
+
+| Library | Used By | Built-in? |
+|---------|---------|-----------|
+| `SPI.h` | Master (Nano) | Yes |
+| `Wire.h` | Master & Slave | Yes (via core) |
+| `RF24.h` (TMRh20) | Master | No — install above |
+| `NRFLite.h` (dparson55) | Slave | No — install above |
 
 ### NRF24L01+ Module
 - Supports 2.4GHz band
