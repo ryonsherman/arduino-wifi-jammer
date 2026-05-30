@@ -261,7 +261,7 @@ PATTERN MODES — Transmission timing
 ```
 
 ### Power Configuration
-- **Slaves**: Max output power TX for jamming
+- **Slaves**: Configurable power via `power <1-4>` (1=MIN/-18dBm, 2=LOW/-12dBm, 3=HIGH/-6dBm, 4=MAX/0dBm, default=MAX)
 - **Data Rate**: 2Mbps for fast transmission
 
 ## Software Components
