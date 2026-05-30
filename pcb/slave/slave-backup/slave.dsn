@@ -1,0 +1,240 @@
+(pcb "/Users/ryon.sherman/Development/sandbox/Arduino/wifi-jammer/pcb/slave/slave/slave.dsn"
+  (parser
+    (string_quote ")
+    (space_in_quoted_tokens on)
+    (host_cad "KiCad's Pcbnew")
+    (host_version "10.0.3")
+  )
+  (resolution um 10)
+  (unit um)
+  (structure
+    (layer F.Cu
+      (type signal)
+      (property
+        (index 0)
+      )
+    )
+    (layer B.Cu
+      (type signal)
+      (property
+        (index 1)
+      )
+    )
+    (boundary
+      (path pcb 0  135300 -50100  0 -50100  0 0  135300 0  135300 -50100)
+    )
+    (via "Via[0-1]_600:300_um")
+    (rule
+      (width 200)
+      (clearance 200)
+      (clearance 50 (type smd_smd))
+    )
+  )
+  (placement
+    (component Connector_PinSocket_2.54mm:PinSocket_2x15_P2.54mm_Vertical
+      (place U1 11620 -23780 front 0)
+      (place U2 31940 -23780 front 0)
+      (place U3 52260 -23780 front 0)
+      (place U4 72580 -23780 front 0)
+      (place U5 92900 -23780 front 0)
+      (place U6 113220 -23780 front 0)
+    )
+    (component Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical
+      (place J1 11620 -46560 front 90 (PN SPI))
+      (place J2 31940 -46560 front 90 (PN SPI))
+      (place J3 52260 -46560 front 90 (PN SPI))
+      (place J4 72580 -46560 front 90 (PN SPI))
+      (place J5 92900 -46560 front 90 (PN SPI))
+      (place J6 113220 -46560 front 90 (PN SPI))
+    )
+    (component Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical
+      (place J7 126840 -25050 front 0 (PN I2C))
+    )
+    (component SPI_Reference
+      (place SPI 132840 -44640 front 0)
+    )
+  )
+  (library
+    (image Connector_PinSocket_2.54mm:PinSocket_2x15_P2.54mm_Vertical
+      (outline (polygon signal 0  9365 -20295  -9365 -20295  -9365 20295  9365 20295))
+      (outline (path signal 120  -9120 20050  9120 20050  9120 -20050  -9120 -20050  -9120 20050))
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 1 -7620 -17780)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 2 -7620 -15240)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 3 -7620 -12700)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 4 -7620 -10160)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 5 -7620 -7620)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 6 -7620 -5080)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 7 -7620 -2540)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 8 -7620 0)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 9 -7620 2540)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 10 -7620 5080)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 11 -7620 7620)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 12 -7620 10160)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 13 -7620 12700)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 14 -7620 15240)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 15 -7620 17780)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 16 7620 17780)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 17 7620 15240)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 18 7620 12700)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 19 7620 10160)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 20 7620 7620)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 21 7620 5080)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 22 7620 2540)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 23 7620 0)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 24 7620 -2540)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 25 7620 -5080)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 26 7620 -7620)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 27 7620 -10160)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 28 7620 -12700)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 29 7620 -15240)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 30 7620 -17780)
+    )
+    (image Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical
+      (outline (polygon signal 0  -1745 -7595  -1745 7595  1745 7595  1745 -7595))
+      (outline (path signal 120  -1500 7350  -1500 -7350  1500 -7350  1500 7350  -1500 7350))
+      (pin Oval[A]Pad_1700.000000x1700.000000_um (rotate 270) 1 0 -5080)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um (rotate 270) 2 0 -2540)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um (rotate 270) 3 0 0)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um (rotate 270) 4 0 2540)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um (rotate 270) 5 0 5080)
+    )
+    (image Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical
+      (outline (polygon signal 0  1745 -6325  -1745 -6325  -1745 6325  1745 6325))
+      (outline (path signal 120  -1500 6080  1500 6080  1500 -6080  -1500 -6080  -1500 6080))
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 1 0 -3810)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 2 0 -1270)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 3 0 1270)
+      (pin Oval[A]Pad_1700.000000x1700.000000_um 4 0 3810)
+    )
+    (image SPI_Reference
+    )
+    (padstack Oval[A]Pad_1700.000000x1700.000000_um
+      (shape (path F.Cu 1700  0 0  0 0))
+      (shape (path B.Cu 1700  0 0  0 0))
+      (attach off)
+    )
+    (padstack "Via[0-1]_600:300_um"
+      (shape (circle F.Cu 600))
+      (shape (circle B.Cu 600))
+      (attach off)
+    )
+  )
+  (network
+    (net GND
+      (pins U1-29 U2-29 U3-29 U4-29 U5-29 U6-29 J7-1)
+    )
+    (net 5V
+      (pins U1-28 U2-28 U3-28 U4-28 U5-28 U6-28 J7-2)
+    )
+    (net SDA
+      (pins U1-7 U2-7 U3-7 U4-7 U5-7 U6-7 J7-4)
+    )
+    (net SCL
+      (pins U1-6 U2-6 U3-6 U4-6 U5-6 U6-6 J7-3)
+    )
+    (net U1_CE
+      (pins U1-21 J1-1)
+    )
+    (net U1_CSN
+      (pins U1-20 J1-2)
+    )
+    (net U1_MOSI
+      (pins U1-19 J1-3)
+    )
+    (net U1_MISO
+      (pins U1-18 J1-4)
+    )
+    (net U1_SCK
+      (pins U1-17 J1-5)
+    )
+    (net U2_CE
+      (pins U2-21 J2-1)
+    )
+    (net U2_CSN
+      (pins U2-20 J2-2)
+    )
+    (net U2_MOSI
+      (pins U2-19 J2-3)
+    )
+    (net U2_MISO
+      (pins U2-18 J2-4)
+    )
+    (net U2_SCK
+      (pins U2-17 J2-5)
+    )
+    (net U3_CE
+      (pins U3-21 J3-1)
+    )
+    (net U3_CSN
+      (pins U3-20 J3-2)
+    )
+    (net U3_MOSI
+      (pins U3-19 J3-3)
+    )
+    (net U3_MISO
+      (pins U3-18 J3-4)
+    )
+    (net U3_SCK
+      (pins U3-17 J3-5)
+    )
+    (net U4_CE
+      (pins U4-21 J4-1)
+    )
+    (net U4_CSN
+      (pins U4-20 J4-2)
+    )
+    (net U4_MOSI
+      (pins U4-19 J4-3)
+    )
+    (net U4_MISO
+      (pins U4-18 J4-4)
+    )
+    (net U4_SCK
+      (pins U4-17 J4-5)
+    )
+    (net U5_CE
+      (pins U5-21 J5-1)
+    )
+    (net U5_CSN
+      (pins U5-20 J5-2)
+    )
+    (net U5_MOSI
+      (pins U5-19 J5-3)
+    )
+    (net U5_MISO
+      (pins U5-18 J5-4)
+    )
+    (net U5_SCK
+      (pins U5-17 J5-5)
+    )
+    (net U6_CE
+      (pins U6-21 J6-1)
+    )
+    (net U6_CSN
+      (pins U6-20 J6-2)
+    )
+    (net U6_MOSI
+      (pins U6-19 J6-3)
+    )
+    (net U6_MISO
+      (pins U6-18 J6-4)
+    )
+    (net U6_SCK
+      (pins U6-17 J6-5)
+    )
+    (class kicad_default 5V GND SCL SDA U1_CE U1_CSN U1_MISO U1_MOSI U1_SCK
+      U2_CE U2_CSN U2_MISO U2_MOSI U2_SCK U3_CE U3_CSN U3_MISO U3_MOSI U3_SCK
+      U4_CE U4_CSN U4_MISO U4_MOSI U4_SCK U5_CE U5_CSN U5_MISO U5_MOSI U5_SCK
+      U6_CE U6_CSN U6_MISO U6_MOSI U6_SCK
+      (circuit
+        (use_via "Via[0-1]_600:300_um")
+      )
+      (rule
+        (width 200)
+        (clearance 200)
+      )
+    )
+  )
+  (wiring
+  )
+)

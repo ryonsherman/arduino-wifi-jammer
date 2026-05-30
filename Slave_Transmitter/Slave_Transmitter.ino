@@ -9,13 +9,19 @@
  * 
  * Memory budget (ATtiny88): 512B RAM, 6780B Flash
  * Optimization target: <256B RAM to leave headroom for stack
+ * 
+ * Serial debugging via SoftwareSerial on PD0(RX)/PD1(TX) - connect FTDI adapter
  */
 
 #include <NRFLite.h>
 #include <Wire.h>
+#include <SoftwareSerial.h>
 
-// Uncomment for debug output (adds ~100 bytes RAM for Serial buffer)
-// #define DEBUG_SERIAL
+// SoftwareSerial pins (directly next to GND on MH-Tiny for easy FTDI hookup)
+#define SOFT_RX 0  // PD0 - connect to FTDI TX
+#define SOFT_TX 1  // PD1 - connect to FTDI RX
+
+SoftwareSerial mySerial(SOFT_RX, SOFT_TX);
 
 #define SLAVE_ID 0
 #define I2C_ADDR (0x01 + SLAVE_ID)
@@ -98,10 +104,62 @@ static uint8_t calc_freq(uint8_t mode, uint8_t ch, uint8_t local_idx, uint8_t gr
     uint8_t center = 7 + (ch << 2) + ch;  // 7 + ch*5
     freq = center + offset;
   } else {
-    // Full spectrum: 15 + local_idx*5
-    freq = 15 + (local_idx << 2) + local_idx;
+    // Full spectrum: 14 + local_idx*5  (staggered between channels for max coverage)
+    freq = 14 + (local_idx << 2) + local_idx;
   }
   return (freq > MAX_FREQ_OFFSET) ? MAX_FREQ_OFFSET : freq;
+}
+
+/**
+ * Parse serial commands from USB.
+ * Commands:
+ *   channel <x>  - Jam Wi-Fi channel x (1-13) in single mode immediately
+ *   stop         - Stop jamming
+ */
+static void parseSerial() {
+  static char buf[16];
+  static uint8_t pos = 0;
+
+  while (mySerial.available()) {
+    char c = mySerial.read();
+    if (c == '\n' || c == '\r') {
+      buf[pos] = '\0';
+      if (pos > 0) {
+        if (strncmp_P(buf, PSTR("channel "), 8) == 0) {
+          uint8_t ch = atoi(buf + 8);
+          if (ch < 1 || ch > 13) {
+            mySerial.print(F("Invalid ch "));
+            mySerial.println(ch);
+          } else {
+            uint8_t sreg = SREG;
+            cli();
+            current_mode = 1;
+            current_channel = ch;
+            current_fanout = (0 << 4) | 1;
+            current_jamming = 1;
+            SREG = sreg;
+
+            uint8_t freq = calc_freq(1, ch, 0, 1);
+            radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, freq);
+            mySerial.print(F("Jamming ch"));
+            mySerial.print(ch);
+            mySerial.print(F(" @ "));
+            mySerial.print(2400 + freq);
+            mySerial.println(F(" MHz"));
+          }
+        } else if (strcmp_P(buf, PSTR("stop")) == 0) {
+          current_jamming = 0;
+          mySerial.println(F("Stopped"));
+        } else {
+          mySerial.print(F("Unknown: "));
+          mySerial.println(buf);
+        }
+      }
+      pos = 0;
+    } else if (pos < sizeof(buf) - 1) {
+      buf[pos++] = c;
+    }
+  }
 }
 
 /**
@@ -168,23 +226,16 @@ void requestI2C() {
 }
 
 void setup() {
-#ifdef DEBUG_SERIAL
-  Serial.begin(115200);
-#endif
+  mySerial.begin(9600);  // SoftwareSerial works best at 9600 on ATtiny
   Wire.begin(I2C_ADDR);
   Wire.onReceive(receiveI2C);
   Wire.onRequest(requestI2C);
 
   if (!radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, 0)) {
-#ifdef DEBUG_SERIAL
-    Serial.println(F("Radio FAIL"));
-#endif
+    mySerial.println(F("Radio FAIL"));
+  } else {
+    mySerial.println(F("Radio OK"));
   }
-#ifdef DEBUG_SERIAL
-  else {
-    Serial.println(F("Radio OK"));
-  }
-#endif
 }
 
 void loop() {
@@ -208,18 +259,15 @@ void loop() {
                                FANOUT_LOCAL_IDX(current_fanout), 
                                FANOUT_GROUP_SIZE(current_fanout));
       radio.init(SLAVE_ID, CE_PIN, CSN_PIN, NRFLite::BITRATE2MBPS, freq);
-#ifdef DEBUG_SERIAL
-      Serial.print(F("@ "));
-      Serial.println(2400 + freq);
-#endif
+      mySerial.print(F("@ "));
+      mySerial.println(2400 + freq);
+    } else {
+      mySerial.println(F("STOP"));
     }
-#ifdef DEBUG_SERIAL
-    else {
-      Serial.println(F("STOP"));
-    }
-#endif
   }
   
+  parseSerial();
+
   if (current_jamming) {
     transmit_noise();
   }

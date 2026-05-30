@@ -1,0 +1,167 @@
+(pcb "/Users/ryon.sherman/Development/sandbox/Arduino/wifi-jammer/pcb/master/master/master.dsn"
+  (parser
+    (string_quote ")
+    (space_in_quoted_tokens on)
+    (host_cad "KiCad's Pcbnew")
+    (host_version "10.0.3")
+  )
+  (resolution um 10)
+  (unit um)
+  (structure
+    (layer F.Cu
+      (type signal)
+      (property
+        (index 0)
+      )
+    )
+    (layer B.Cu
+      (type signal)
+      (property
+        (index 1)
+      )
+    )
+    (boundary
+      (path pcb 0  42380 -52460  0 -52460  0 0  42380 0  42380 -52460)
+    )
+    (via "Via[0-1]_600:300_um")
+    (rule
+      (width 200)
+      (clearance 200)
+      (clearance 50 (type smd_smd))
+    )
+  )
+  (placement
+    (component Connector_PinSocket_2.54mm:PinSocket_2x15_P2.54mm_Vertical
+      (place U1 30920 -22570 front 0)
+    )
+    (component Custom:LM2596_Socket
+      (place U2 10460 -20790 front 90 (PN LM2596))
+    )
+    (component Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
+      (place J1 3920 -46210 front 90 (PN 36V_IN))
+      (place J2 13380 -46210 front 90 (PN 5V_OUT))
+    )
+    (component Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical
+      (place J3 26840 -46210 front 90)
+    )
+    (component Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal
+      (place R1 6460 -36750 front 0)
+      (place R2 6460 -40750 front 0)
+    )
+    (component Capacitor_THT:CP_Radial_D5.0mm_P2.00mm
+      (place C1 9460 -4790 front 0)
+    )
+  )
+  (library
+    (image Connector_PinSocket_2.54mm:PinSocket_2x15_P2.54mm_Vertical
+      (pin Rect[A]Pad_1700.000000x1700.000000_um 1 -7620 17780)
+      (pin Round[A]Pad_1700.000000_um 2 -7620 15240)
+      (pin Round[A]Pad_1700.000000_um 3 -7620 12700)
+      (pin Round[A]Pad_1700.000000_um 4 -7620 10160)
+      (pin Round[A]Pad_1700.000000_um 5 -7620 7620)
+      (pin Round[A]Pad_1700.000000_um 6 -7620 5080)
+      (pin Round[A]Pad_1700.000000_um 7 -7620 2540)
+      (pin Round[A]Pad_1700.000000_um 8 -7620 0)
+      (pin Round[A]Pad_1700.000000_um 9 -7620 -2540)
+      (pin Round[A]Pad_1700.000000_um 10 -7620 -5080)
+      (pin Round[A]Pad_1700.000000_um 11 -7620 -7620)
+      (pin Round[A]Pad_1700.000000_um 12 -7620 -10160)
+      (pin Round[A]Pad_1700.000000_um 13 -7620 -12700)
+      (pin Round[A]Pad_1700.000000_um 14 -7620 -15240)
+      (pin Round[A]Pad_1700.000000_um 15 -7620 -17780)
+      (pin Round[A]Pad_1700.000000_um 30 7620 17780)
+      (pin Round[A]Pad_1700.000000_um 29 7620 15240)
+      (pin Round[A]Pad_1700.000000_um 28 7620 12700)
+      (pin Round[A]Pad_1700.000000_um 27 7620 10160)
+      (pin Round[A]Pad_1700.000000_um 26 7620 7620)
+      (pin Round[A]Pad_1700.000000_um 25 7620 5080)
+      (pin Round[A]Pad_1700.000000_um 24 7620 2540)
+      (pin Round[A]Pad_1700.000000_um 23 7620 0)
+      (pin Round[A]Pad_1700.000000_um 22 7620 -2540)
+      (pin Round[A]Pad_1700.000000_um 21 7620 -5080)
+      (pin Round[A]Pad_1700.000000_um 20 7620 -7620)
+      (pin Round[A]Pad_1700.000000_um 19 7620 -10160)
+      (pin Round[A]Pad_1700.000000_um 18 7620 -12700)
+      (pin Round[A]Pad_1700.000000_um 17 7620 -15240)
+      (pin Round[A]Pad_1700.000000_um 16 7620 -17780)
+    )
+    (image Custom:LM2596_Socket
+      (outline (path signal 120  -10500 4000  -10500 -4000  10500 -4000  10500 4000  -10500 4000))
+      (pin Rect[A]Pad_1700.000000x1700.000000_um (rotate 270) 1 -8500 4000)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 2 -8500 -4000)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 3 8500 4000)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 4 8500 -4000)
+    )
+    (image Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
+      (pin Rect[A]Pad_1700.000000x1700.000000_um (rotate 270) 1 0 0)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 2 0 -2540)
+    )
+    (image Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical
+      (pin Rect[A]Pad_1700.000000x1700.000000_um (rotate 270) 1 0 0)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 2 0 -2540)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 3 0 -5080)
+      (pin Round[A]Pad_1700.000000_um (rotate 270) 4 0 -7620)
+    )
+    (image Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal
+      (pin Rect[A]Pad_1600.000000x1600.000000_um 1 0 0)
+      (pin Round[A]Pad_1600.000000_um 2 7620 0)
+    )
+    (image Capacitor_THT:CP_Radial_D5.0mm_P2.00mm
+      (pin Rect[A]Pad_1600.000000x1600.000000_um 1 0 0)
+      (pin Round[A]Pad_1600.000000_um 2 2000 0)
+    )
+    (padstack Round[A]Pad_1600.000000_um
+      (shape (circle F.Cu 1600))
+      (shape (circle B.Cu 1600))
+      (attach off)
+    )
+    (padstack Round[A]Pad_1700.000000_um
+      (shape (circle F.Cu 1700))
+      (shape (circle B.Cu 1700))
+      (attach off)
+    )
+    (padstack Rect[A]Pad_1600.000000x1600.000000_um
+      (shape (rect F.Cu -800 -800 800 800))
+      (shape (rect B.Cu -800 -800 800 800))
+      (attach off)
+    )
+    (padstack Rect[A]Pad_1700.000000x1700.000000_um
+      (shape (rect F.Cu -850 -850 850 850))
+      (shape (rect B.Cu -850 -850 850 850))
+      (attach off)
+    )
+    (padstack "Via[0-1]_600:300_um"
+      (shape (circle F.Cu 600))
+      (shape (circle B.Cu 600))
+      (attach off)
+    )
+  )
+  (network
+    (net GND
+      (pins U1-17 U2-2 U2-4 J1-2 J2-2 J3-4 C1-2)
+    )
+    (net 5V
+      (pins U1-18 U2-3 J2-1 J3-3 R1-1 R2-1 C1-1)
+    )
+    (net 36V
+      (pins U2-1 J1-1)
+    )
+    (net SDA
+      (pins U1-7 J3-1 R1-2)
+    )
+    (net SCL
+      (pins U1-6 J3-2 R2-2)
+    )
+    (class kicad_default 36V 5V GND SCL SDA
+      (circuit
+        (use_via "Via[0-1]_600:300_um")
+      )
+      (rule
+        (width 200)
+        (clearance 200)
+      )
+    )
+  )
+  (wiring
+  )
+)

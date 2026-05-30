@@ -10,13 +10,16 @@ This system creates a coordinated jamming swarm that can:
 - Use custom distribution patterns for targeted jamming
 - Maintain configuration between start/stop cycles
 - Report status and frequency distribution via USB Serial
+- **Hardware switch for instant full-spectrum jamming** (no PC required)
+- **RF spectrum scanning** to visualize 2.4GHz activity
 
 ## Hardware Requirements
 
 ### Master Node (1x)
 - Arduino Nano x1
-- NRF24L01+ module x1
-- USB serial connection to PC
+- NRF24L01+ module x1 (for RF spectrum scanning)
+- SPST toggle switch x1 (hardware jamming control)
+- USB serial connection to PC (optional — for software control)
 
 ### Slave Nodes (12x)
 
@@ -49,6 +52,7 @@ Alternatively, **Digispark (ATtiny85)** with USI 2-pin SPI mod (limited to 2 sla
 - **I2C Bus**: SDA (A4), SCL (A5) on all nodes
 - **Master I2C Address**: 0x70
 - **Slave I2C Addresses**: 0x01-0x0C (set by SLAVE_ID)
+- **Hardware Switch**: D2 to GND (ON = jamming enabled)
 - **NRF24L01+ Pins** (Arduino Nano):
   - CE: Pin 9
   - CSN: Pin 10
@@ -193,6 +197,11 @@ LEGEND
 
 ### Master Controller (`Master_Swarm_Controller.ino`)
 
+**Hardware Switch (D2):**
+- Switch ON → Full spectrum jamming starts automatically
+- Switch OFF → Jamming stops
+- Takes precedence over software commands
+
 **Commands:**
 - `help` - Display command list
 - `get [ids]` - Query slave configurations (e.g., `get 0,1,2` or `get all`)
@@ -201,6 +210,16 @@ LEGEND
 - `start` - Begin transmitting with current configuration
 - `stop` - Halt transmission (keep configuration)
 - `status` - Show slave distribution and frequency map
+- `snap` - RF snapshot of all channels (5s default)
+- `snap <seconds>` - RF snapshot with custom collection time (1-60s)
+- `scan <channel>` - Live scan of a single channel (10s default)
+- `scan <channel> <seconds>` - Live scan with custom duration (1-60s)
+
+**RF Scanning:**
+The master's NRF24L01+ module doubles as a spectrum analyzer:
+- `snap` collects signal data across all 13 Wi-Fi channels and displays percentages
+- `scan 6` shows real-time activity on channel 6 with a visual bar graph
+- Useful for finding active channels before jamming
 
 **Distribution Syntax:**
 - Format: `n@channel1,n@channel2,...`
@@ -398,11 +417,14 @@ if (target > 2527) target = 2527;
 ## Future Enhancements
 
 ### Planned Features
-- **Button Input**: Replace USB serial with physical buttons for command entry
 - **OLED Display**: Real-time status display on master node
 - **Auto-Distribution**: Intelligent channel allocation based on detected activity
 - **Power Management**: Sleep modes for battery operation
 - **LED Indicators**: Visual feedback for jamming status
+
+### Completed Features
+- ~~Button Input~~: **Hardware switch** on D2 for instant jamming control
+- **RF Spectrum Scanning**: `snap` and `scan` commands for visualizing 2.4GHz activity
 
 ### Performance Optimizations
 - Reduce loop delay from 100ms to 10ms for faster command response
@@ -417,11 +439,14 @@ wifi-jammer/
 ├── Master_Swarm_Controller/
 │   └── Master_Swarm_Controller.ino    # Master firmware (Arduino Nano)
 ├── Slave_Transmitter/
-│   └── Slave_Transmitter.ino          # Slave firmware (ATtiny88/85 + NRFLite)
-├── Makefile                           # Multi-target compile/upload
+│   └── Slave_Transmitter.ino          # Slave firmware (ATtiny88 + NRFLite)
+├── NRF_Tester/
+│   └── NRF_Tester.ino                 # NRF24L01+ module tester (Nano)
+├── pcb/
+│   ├── master/                        # Master + Power board KiCad project
+│   └── slave/                         # Slave carrier board KiCad project
+├── Makefile                           # Build/upload/monitor commands
 ├── README.md                          # This file
-├── USAGE.md                           # Command reference
-├── WIRING.md                          # Wiring diagrams
 └── .context.md                        # Project agent context
 ```
 
@@ -467,21 +492,19 @@ Use the Makefile from the project root (requires `arduino-cli`):
 # Compile all targets (master + slave ATtiny88)
 make
 
-# Compile master + slave-tiny (ATtiny85)
-make tiny
-
 # Compile individual targets
 make compile-master       # Arduino Nano
 make compile-slave        # ATtiny88 (MH-Tiny)
-make compile-slave-tiny   # ATtiny85 (Digispark)
 
-# Upload
-# Master (Nano) needs PORT:
+# Upload (auto-detects port for master)
+make upload-master        # Arduino Nano (auto-detects /dev/cu.wchusbserial*)
+make upload-slave         # ATtiny88 via USBasp ISP
+
+# Serial monitor
+make monitor              # Opens serial monitor at 115200 baud (Ctrl+C to exit)
+
+# Override port if needed
 make upload-master PORT=/dev/cu.usbserial-XXXX
-
-# Slaves use micronucleus bootloader — plug in when prompted:
-make upload-slave          # ATtiny88 (MH-Tiny)
-make upload-slave-tiny     # ATtiny85 (Digispark)
 ```
 
 ## Quick Start Checklist
@@ -502,6 +525,6 @@ This project is open source. Use freely for Wi-Fi jamming applications.
 
 ---
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Last Updated**: May 2026  
 **Author**: Ryon Sherman

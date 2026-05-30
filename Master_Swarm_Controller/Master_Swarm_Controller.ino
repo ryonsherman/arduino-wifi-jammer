@@ -5,14 +5,39 @@
  * Handshakes with 12 slave units via I2C (address 0x70),
  * sends channel/mode commands, reports status over USB Serial.
  * 
+ * Hardware switch on D2 enables full-spectrum jamming when ON.
+ * 
  * Memory: ATmega328P has 2KB RAM, ~1.5KB used by this code + Serial buffer
  */
 
 #include <Wire.h>
+#include <SPI.h>
 
 // --- Configuration ---
 #define MASTER_ADDR 0x70
 #define TOTAL_SLAVES 12
+
+// --- Hardware Switch ---
+#define HW_SWITCH_PIN 2  // D2 - connect switch between D2 and GND
+
+// --- NRF24L01+ RX Scanner ---
+#define NRF_CE_PIN 9
+#define NRF_CSN_PIN 10
+
+static uint8_t nrf_read_reg(uint8_t reg) {
+  digitalWrite(NRF_CSN_PIN, LOW);
+  SPI.transfer(reg);
+  uint8_t val = SPI.transfer(0x00);
+  digitalWrite(NRF_CSN_PIN, HIGH);
+  return val;
+}
+
+static void nrf_write_reg(uint8_t reg, uint8_t val) {
+  digitalWrite(NRF_CSN_PIN, LOW);
+  SPI.transfer(0x20 | reg);
+  SPI.transfer(val);
+  digitalWrite(NRF_CSN_PIN, HIGH);
+}
 
 // Compile-time guard: local_idx and group_size are packed into 4-bit nibbles (max 15)
 // See send_cmd() byte 4 packing and Slave_Transmitter.ino FANOUT_* macros
@@ -38,6 +63,7 @@ static uint8_t slave_count = 0;
 static uint8_t selected_channel = 0;
 static uint8_t current_mode = MODE_FULL_SPECTRUM;
 static bool jamming_active = false;
+static bool hw_jamming_active = false;  // Hardware switch state
 static uint32_t last_status_ms = 0;
 
 // Packed slave config: 4 bytes per slave instead of 4 (struct padding eliminated)
@@ -143,8 +169,194 @@ static uint8_t calc_freq(uint8_t local_idx, uint8_t group_size, uint8_t mode, ui
     uint8_t center = 7 + (channel << 2) + channel;  // 7 + ch*5
     return center + offset;
   }
-  // Full spectrum: 15 + local_idx*5
-  return 15 + (local_idx << 2) + local_idx;
+  // Full spectrum: 14 + local_idx*5  (staggered between channels for max coverage)
+  return 14 + (local_idx << 2) + local_idx;
+}
+
+/**
+ * Check if NRF24L01+ is responding by verifying register read/write
+ * Returns true if module responds correctly
+ */
+static bool nrf_check() {
+  pinMode(NRF_CE_PIN, OUTPUT);
+  pinMode(NRF_CSN_PIN, OUTPUT);
+  digitalWrite(NRF_CE_PIN, LOW);
+  digitalWrite(NRF_CSN_PIN, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+  
+  // Test 1: Read CONFIG register - should have sane default (0x08 after reset)
+  uint8_t cfg = nrf_read_reg(0x00);
+  if (cfg == 0xFF || cfg == 0x00) {
+    // 0xFF = no device (MISO pulled high), 0x00 = stuck low
+    SPI.endTransaction();
+    SPI.end();
+    return false;
+  }
+  
+  // Test 2: Write/read RF_CH register with test value
+  uint8_t test_ch = 0x4C;  // 76 decimal - arbitrary test value
+  nrf_write_reg(0x05, test_ch);
+  delayMicroseconds(10);
+  uint8_t readback = nrf_read_reg(0x05);
+  
+  // Reset RF_CH to 0 before returning
+  nrf_write_reg(0x05, 0x00);
+  
+  SPI.endTransaction();
+  SPI.end();
+  
+  return (readback == test_ch);
+}
+
+/**
+ * Initialize NRF24L01+ in RX scan mode using direct register access
+ */
+static bool nrf_scan_init() {
+  pinMode(NRF_CE_PIN, OUTPUT);
+  pinMode(NRF_CSN_PIN, OUTPUT);
+  digitalWrite(NRF_CE_PIN, LOW);
+  digitalWrite(NRF_CSN_PIN, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+
+  nrf_write_reg(0x00, 0x0B);  // CONFIG: PWR_UP=1, PRIM_RX=1, CRC=0
+  delay(5);
+  return true;
+}
+
+/**
+ * Scan a single NRF channel for carrier detect (RPD)
+ * Returns 1 if signal > ~-64 dBm detected
+ */
+static uint8_t nrf_scan_channel(uint8_t ch) {
+  digitalWrite(NRF_CE_PIN, LOW);
+  delayMicroseconds(4);
+  nrf_write_reg(0x05, ch);
+  delayMicroseconds(4);
+  digitalWrite(NRF_CE_PIN, HIGH);
+  delayMicroseconds(130);
+  return nrf_read_reg(0x09) & 0x01;
+}
+
+/**
+ * Single RF spectrum snapshot
+ * Collects data for 5 seconds, then displays aggregated results
+ */
+static void cmd_snap(uint8_t seconds) {
+  if (!nrf_scan_init()) return;
+
+  Serial.println(F("\n======= RF Snapshot ======="));
+  Serial.print(F("Collecting data"));
+
+  uint16_t counts[14] = {0};  // channels 1-13
+  uint16_t passes = 0;
+  uint32_t start = millis();
+  uint32_t duration = (uint32_t)seconds * 1000;
+  uint8_t last_dot = 0;
+
+  while (millis() - start < duration) {
+    for (uint8_t ch = 1; ch <= 13; ch++) {
+      uint8_t nrf_center = 7 + ch * 5;
+      if (nrf_scan_channel(nrf_center)) counts[ch]++;
+    }
+    passes++;
+    
+    // Print dot every 3 seconds
+    uint8_t elapsed_dots = (millis() - start) / 3000;
+    if (elapsed_dots > last_dot) {
+      Serial.print('.');
+      last_dot = elapsed_dots;
+    }
+  }
+
+  digitalWrite(NRF_CE_PIN, LOW);
+  SPI.endTransaction();
+  SPI.end();
+
+  Serial.println(F(" done"));
+  Serial.println(F("---------------------------"));
+  Serial.println(F("Ch  Freq        Signal"));
+  for (uint8_t ch = 1; ch <= 13; ch++) {
+    uint8_t pct = (uint32_t)counts[ch] * 100 / passes;
+
+    if (ch < 10) Serial.print(' ');
+    Serial.print(ch);
+    Serial.print(F("  "));
+    Serial.print(2400 + 7 + ch * 5);
+    Serial.print(F(" MHz "));
+
+    for (uint8_t i = 0; i < 10; i++) {
+      Serial.print(i * 10 < pct ? '#' : '.');
+    }
+    Serial.print(F(" "));
+    if (pct < 10) Serial.print(' ');
+    Serial.print(pct);
+    Serial.println('%');
+  }
+  
+  Serial.println(F("==========================="));
+}
+
+/**
+ * Continuous RF waterfall scan for a single Wi-Fi channel
+ * Shows signal intensity over time with a bar graph per second
+ */
+static void cmd_scan_channel(uint8_t wifi_ch, uint8_t seconds) {
+  if (!nrf_scan_init()) return;
+
+  uint8_t nrf_center = 7 + wifi_ch * 5;
+  uint16_t freq = 2400 + nrf_center;
+
+  Serial.println(F("\n======== RF Live Scan ========"));
+  Serial.print(F("Channel "));
+  Serial.print(wifi_ch);
+  Serial.print(F(" ("));
+  Serial.print(freq);
+  Serial.print(F(" MHz) for "));
+  Serial.print(seconds);
+  Serial.println(F("s"));
+  Serial.println(F("------------------------------"));
+
+  uint32_t start = millis();
+  uint8_t last_sec = 255;
+  uint16_t hits = 0;
+  uint16_t samples = 0;
+
+  while (millis() - start < (uint32_t)seconds * 1000) {
+    uint8_t cur_sec = (millis() - start) / 1000;
+    
+    if (nrf_scan_channel(nrf_center)) hits++;
+    samples++;
+    
+    // Print once per second
+    if (cur_sec != last_sec && last_sec != 255) {
+      uint8_t pct = samples > 0 ? (uint32_t)hits * 100 / samples : 0;
+      
+      // 20-char bar
+      for (uint8_t i = 0; i < 20; i++) {
+        Serial.print(i * 5 < pct ? '#' : '.');
+      }
+      Serial.print(F(" "));
+      if (pct < 10) Serial.print(' ');
+      if (pct < 100) Serial.print(' ');
+      Serial.print(pct);
+      Serial.print(F("% "));
+      if (cur_sec < 10) Serial.print(' ');
+      Serial.print(cur_sec);
+      Serial.println('s');
+      
+      hits = 0;
+      samples = 0;
+    }
+    last_sec = cur_sec;
+  }
+
+  digitalWrite(NRF_CE_PIN, LOW);
+  SPI.endTransaction();
+  SPI.end();
+  
+  Serial.println(F("=============================="));
 }
 
 /**
@@ -287,19 +499,45 @@ static void poll_slaves() {
  * Print help menu
  */
 static void print_help() {
-  Serial.println(F("\n=== Commands ==="));
-  Serial.println(F("help    - Show commands"));
-  Serial.println(F("get     - Get slave config (get all, get 0,1,2)"));
-  Serial.println(F("set     - Custom dist (set 4@1,2@6,2@11)"));
-  Serial.println(F("channel - Set channel (1-13) or 0=spectrum"));
-  Serial.println(F("start   - Begin jamming"));
-  Serial.println(F("stop    - Stop jamming"));
-  Serial.println(F("status  - Show status & freq map"));
+  Serial.println(F("\n========== Commands =========="));
+  Serial.println(F("help      - Show commands"));
+  Serial.println(F("get       - Get slave config (get all, get 0,1,2)"));
+  Serial.println(F("set       - Custom dist (set 4@1,2@6,2@11)"));
+  Serial.println(F("channel   - Set channel (1-13) or 0=spectrum"));
+  Serial.println(F("start     - Begin jamming"));
+  Serial.println(F("stop      - Stop jamming"));
+  Serial.println(F("status    - Show status & freq map"));
+  Serial.println(F("snap      - RF snapshot 5s (default)"));
+  Serial.println(F("snap 30   - RF snapshot 30s collection"));
+  Serial.println(F("scan 6    - Live scan ch 6, 10s (default)"));
+  Serial.println(F("scan 6 30 - Live scan ch 6 for 30s"));
+  Serial.println(F("=============================="));
 }
 
 void setup() {
   Serial.begin(115200);
   Serial.println(F("\n=== MASTER CONTROLLER ==="));
+  
+  // Initialize hardware switch pin (active LOW with internal pull-up)
+  pinMode(HW_SWITCH_PIN, INPUT_PULLUP);
+  
+  // Check NRF24L01+ RX module
+  Serial.print(F("NRF24L01+: "));
+  if (nrf_check()) {
+    Serial.println(F("OK"));
+  } else {
+    Serial.println(F("FAIL - check wiring"));
+    Serial.println(F("  CE=D9, CSN=D10, MOSI=D11, MISO=D12, SCK=D13"));
+    Serial.println(F("  VCC=3.3V (not 5V!), GND"));
+  }
+  
+  // Check hardware switch state
+  Serial.print(F("HW Switch: "));
+  if (digitalRead(HW_SWITCH_PIN) == LOW) {
+    Serial.println(F("ON - jamming enabled"));
+  } else {
+    Serial.println(F("OFF"));
+  }
   
   Wire.begin(MASTER_ADDR);
   
@@ -355,6 +593,10 @@ void executeCommand(String &cmdLine) {
     }
     
   } else if (cmd == F("set")) {
+    if (hw_jamming_active) {
+      Serial.println(F("HW switch is ON - turn off to use software control"));
+      return;
+    }
     // Parse distribution: "4@1,2@6,2@11"
     String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
     uint8_t idx = 0;
@@ -393,6 +635,10 @@ void executeCommand(String &cmdLine) {
     print_status();
     
   } else if (cmd == F("channel")) {
+    if (hw_jamming_active) {
+      Serial.println(F("HW switch is ON - turn off to use software control"));
+      return;
+    }
     String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
     uint8_t ch = args.toInt();
     
@@ -414,6 +660,10 @@ void executeCommand(String &cmdLine) {
     }
     
   } else if (cmd == F("start")) {
+    if (hw_jamming_active) {
+      Serial.println(F("HW switch is ON - turn off to use software control"));
+      return;
+    }
     if (slave_count == 0) {
       Serial.println(F("No slaves"));
       return;
@@ -429,6 +679,10 @@ void executeCommand(String &cmdLine) {
     print_freq_map();
     
   } else if (cmd == F("stop")) {
+    if (hw_jamming_active) {
+      Serial.println(F("HW switch is ON - turn off to use software control"));
+      return;
+    }
     if (!jamming_active) {
       Serial.println(F("Already stopped"));
       return;
@@ -446,6 +700,46 @@ void executeCommand(String &cmdLine) {
     print_status();
     print_freq_map();
     
+  } else if (cmd == F("snap")) {
+    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
+    uint8_t sec = 5;  // Default 5 seconds
+    if (args.length() > 0) {
+      sec = args.toInt();
+      if (sec < 1) sec = 1;
+      if (sec > 60) sec = 60;
+    }
+    cmd_snap(sec);
+    
+  } else if (cmd == F("scan")) {
+    // scan <channel> [seconds]
+    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
+    args.trim();
+    
+    if (args.length() == 0) {
+      Serial.println(F("Usage: scan <channel> [seconds]"));
+      Serial.println(F("  channel: 1-13"));
+      Serial.println(F("  seconds: 1-60 (default 10)"));
+      return;
+    }
+    
+    // Parse channel and optional seconds
+    int sp2 = args.indexOf(' ');
+    uint8_t ch = args.toInt();
+    uint8_t sec = 10;  // Default
+    
+    if (sp2 != -1) {
+      sec = args.substring(sp2 + 1).toInt();
+    }
+    
+    if (ch < 1 || ch > 13) {
+      Serial.println(F("Channel must be 1-13"));
+      return;
+    }
+    if (sec < 1) sec = 1;
+    if (sec > 60) sec = 60;
+    
+    cmd_scan_channel(ch, sec);
+    
   } else {
     Serial.print(F("Unknown: "));
     Serial.println(cmd);
@@ -457,6 +751,25 @@ void executeCommand(String &cmdLine) {
  * Main loop
  */
 void loop() {
+  // Check hardware switch state
+  bool switch_on = (digitalRead(HW_SWITCH_PIN) == LOW);
+  
+  if (switch_on && !hw_jamming_active) {
+    // Switch just turned ON - start full spectrum jamming
+    hw_jamming_active = true;
+    current_mode = MODE_FULL_SPECTRUM;
+    selected_channel = 0;
+    send_cmd_all(MODE_FULL_SPECTRUM, 0, CMD_START);
+    jamming_active = true;
+    Serial.println(F("\n[HW] Switch ON - full spectrum jamming started"));
+  } else if (!switch_on && hw_jamming_active) {
+    // Switch just turned OFF - stop jamming
+    hw_jamming_active = false;
+    send_cmd_all(current_mode, selected_channel, CMD_STOP);
+    jamming_active = false;
+    Serial.println(F("\n[HW] Switch OFF - jamming stopped"));
+  }
+  
   if (Serial.available()) {
     String cmdLine = Serial.readStringUntil('\n');
     executeCommand(cmdLine);
