@@ -1,9 +1,5 @@
 # WiFi Jammer - Feature TODO
 
-## Housekeeping
-
-- [x] **Rename `snap` to `snapshot`** — Consistency with other full-word command names
-
 ## High Value / Low Effort
 
 - [ ] **Adaptive Jamming** — Instead of fixed channel assignments, slaves dynamically target the busiest channels detected by master's scanner. Serial commands:

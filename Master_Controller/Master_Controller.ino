@@ -1,5 +1,5 @@
 /**
- * Master_Swarm_Controller.ino
+ * Master_Controller.ino
  * 
  * Master node for distributed Wi-Fi jamming. Runs on Arduino Nano.
  * Handshakes with 12 slave units via I2C (address 0x70),

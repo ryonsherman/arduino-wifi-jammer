@@ -195,7 +195,7 @@ LEGEND
 
 ## Software Components
 
-### Master Controller (`Master_Swarm_Controller.ino`)
+### Master Controller (`Master_Controller.ino`)
 
 **Hardware Switch (D2):**
 - Switch ON → Full spectrum jamming starts automatically
@@ -436,8 +436,8 @@ if (target > 2527) target = 2527;
 
 ```
 wifi-jammer/
-├── Master_Swarm_Controller/
-│   └── Master_Swarm_Controller.ino    # Master firmware (Arduino Nano)
+├── Master_Controller/
+│   └── Master_Controller.ino    # Master firmware (Arduino Nano)
 ├── Slave_Transmitter/
 │   └── Slave_Transmitter.ino          # Slave firmware (ATtiny88 + NRFLite)
 ├── NRF_Tester/

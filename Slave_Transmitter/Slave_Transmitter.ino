@@ -40,7 +40,7 @@ SoftwareSerial mySerial(SOFT_RX, SOFT_TX);
 #define TOTAL_SLAVES 12
 
 // Compile-time guard: local_idx and group_size are packed into 4-bit nibbles (max 15)
-// See FANOUT_* macros and Master_Swarm_Controller.ino send_cmd() byte 4 packing
+// See FANOUT_* macros and Master_Controller.ino send_cmd() byte 4 packing
 #if TOTAL_SLAVES > 15
 #error "TOTAL_SLAVES exceeds 15 - nibble packing in fanout byte will overflow"
 #endif

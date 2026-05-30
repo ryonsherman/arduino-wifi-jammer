@@ -13,7 +13,7 @@ ARDUINO_CLI = arduino-cli
 MASTER_FQBN   = arduino:avr:nano:cpu=atmega328
 SLAVE_FQBN    = ATTinyCore:avr:attinyx8micr
 
-MASTER_DIR    = Master_Swarm_Controller
+MASTER_DIR    = Master_Controller
 SLAVE_DIR     = Slave_Transmitter
 
 # Auto-detect Nano port (CH340 serial)
