@@ -15,6 +15,7 @@ This system creates a coordinated jamming swarm that can:
 
 ### Master Node (1x)
 - Arduino Nano x1
+- NRF24L01+ module x1
 - USB serial connection to PC
 
 ### Slave Nodes (12x)
@@ -27,7 +28,7 @@ This system creates a coordinated jamming swarm that can:
 |------|----------|-------|--------------|
 | Arduino Nano (master) | 1 | ~$15 for 3 units | ~$5 |
 | MH-Tiny ATtiny88 (slaves) | 12 | ~$22 for 10 units | ~$27 |
-| NRF24L01+ module | 12 | Breakout board optional | ~$60 |
+| NRF24L01+ module | 13 | Breakout board optional | ~$65 |
 | 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 9V battery (USB rechargeable) | 4 | ~$20 for 4 units | ~$20 |
