@@ -19,15 +19,22 @@ This system creates a coordinated jamming swarm that can:
 - USB serial connection to PC
 
 ### Slave Nodes (12x)
-- MH-Tiny (ATtiny88) clone x12 — or Digispark (ATtiny85) with USI 2-pin mod
-- NRF24L01+ module x12 (TX mode)
+
+You can use **either**:
+- **Arduino Nano x12** — easiest option, has built-in 3.3V regulator and USB-serial, works out of the box
+- **MH-Tiny (ATtiny88) clone x12** — cheaper (~$2.20 each), but:
+  - **No 3.3V regulator** — NRF24 modules need external 3.3V supply
+  - **No built-in USB-serial** — requires a CH340/CH341 USB adapter or an Arduino as ISP for initial flashing
+  - Smaller footprint, lower power
+
+Alternatively, **Digispark (ATtiny85)** with USI 2-pin SPI mod (limited to 2 slaves).
 
 ### Components Bill of Materials
 
 | Item | Quantity | Notes | Approx. Cost |
 |------|----------|-------|--------------|
 | Arduino Nano (master) | 1 | ~$15 for 3 units | ~$5 |
-| MH-Tiny ATtiny88 (slaves) | 12 | ~$22 for 10 units | ~$27 |
+| Arduino Nano (slaves) | 12 | Alternatively, MH-Tiny ATtiny88 ~$2.20 each | ~$60 |
 | NRF24L01+ module | 13 | Breakout board optional | ~$65 |
 | 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
@@ -35,7 +42,7 @@ This system creates a coordinated jamming swarm that can:
 | Buck converter (step-down) | 1 | ~$8 for 5 units | ~$2 |
 | 100uF capacitor | 1 | ~$5 for 20 units | ~$1 |
 
-**Estimated Total**: ~$159 for full 13-node swarm (battery power)
+**Estimated Total**: ~$159 (MH-Tiny slaves) / ~$219 (all Nano slaves) for full 13-node swarm
 
 ### Connections
 - **I2C Bus**: SDA (A4), SCL (A5) on all nodes
@@ -368,18 +375,24 @@ arduino-cli lib install NRFLite
 Use the Makefile from the project root (requires `arduino-cli`):
 
 ```sh
-# Compile all targets
+# Compile all targets (master + slave ATtiny88)
 make
+
+# Compile master + slave-tiny (ATtiny85)
+make tiny
 
 # Compile individual targets
 make compile-master       # Arduino Nano
 make compile-slave        # ATtiny88 (MH-Tiny)
-make compile-slave-85     # ATtiny85 (Digispark)
+make compile-slave-tiny   # ATtiny85 (Digispark)
 
-# Upload (master needs PORT)
+# Upload
+# Master (Nano) needs PORT:
 make upload-master PORT=/dev/cu.usbserial-XXXX
-make upload-slave         # plugs in when prompted (micronecleus)
-make upload-slave-85      # plugs in when prompted (micronecleus)
+
+# Slaves use micronucleus bootloader — plug in when prompted:
+make upload-slave          # ATtiny88 (MH-Tiny)
+make upload-slave-tiny     # ATtiny85 (Digispark)
 ```
 
 ## Quick Start Checklist
