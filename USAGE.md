@@ -50,12 +50,14 @@ Examples:
   `get all`          -> Show all slaves (explicit)
 
 Output Format:
-  === Slave Status ===
-  Active: 12/12
-  Slave 1 [ACTIVE] Mode: Custom
-  Slave 2 [ACTIVE] Mode: Custom
-  ...
-  Slave 12 [ACTIVE] Mode: Custom
+```
+=== Slave Status ===
+Active: 12/12
+Slave 1 [ACTIVE] Mode: Custom
+Slave 2 [ACTIVE] Mode: Custom
+...
+Slave 12 [ACTIVE] Mode: Custom
+```
 
 
 ### 3. set \<distribution\>
