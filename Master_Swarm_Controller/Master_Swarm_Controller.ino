@@ -243,7 +243,7 @@ static uint8_t nrf_scan_channel(uint8_t ch) {
  * Single RF spectrum snapshot
  * Collects data for 5 seconds, then displays aggregated results
  */
-static void cmd_snap(uint8_t seconds) {
+static void cmd_snapshot(uint8_t seconds) {
   if (!nrf_scan_init()) return;
 
   Serial.println(F("\n======= RF Snapshot ======="));
@@ -499,19 +499,19 @@ static void poll_slaves() {
  * Print help menu
  */
 static void print_help() {
-  Serial.println(F("\n========== Commands =========="));
-  Serial.println(F("help      - Show commands"));
-  Serial.println(F("get       - Get slave config (get all, get 0,1,2)"));
-  Serial.println(F("set       - Custom dist (set 4@1,2@6,2@11)"));
-  Serial.println(F("channel   - Set channel (1-13) or 0=spectrum"));
-  Serial.println(F("start     - Begin jamming"));
-  Serial.println(F("stop      - Stop jamming"));
-  Serial.println(F("status    - Show status & freq map"));
-  Serial.println(F("snap      - RF snapshot 5s (default)"));
-  Serial.println(F("snap 30   - RF snapshot 30s collection"));
-  Serial.println(F("scan 6    - Live scan ch 6, 10s (default)"));
-  Serial.println(F("scan 6 30 - Live scan ch 6 for 30s"));
-  Serial.println(F("=============================="));
+  Serial.println(F("\n============== Commands =============="));
+  Serial.println(F("help        - Show commands"));
+  Serial.println(F("get         - Get slave config (get all, get 0,1,2)"));
+  Serial.println(F("set         - Custom dist (set 4@1,2@6,2@11)"));
+  Serial.println(F("channel     - Set channel (1-13) or 0=spectrum"));
+  Serial.println(F("start       - Begin jamming"));
+  Serial.println(F("stop        - Stop jamming"));
+  Serial.println(F("status      - Show status & freq map"));
+  Serial.println(F("snapshot    - RF snapshot 5s (default)"));
+  Serial.println(F("snapshot 30 - RF snapshot 30s collection"));
+  Serial.println(F("scan 6      - Live scan ch 6, 10s (default)"));
+  Serial.println(F("scan 6 30   - Live scan ch 6 for 30s"));
+  Serial.println(F("======================================"));
 }
 
 void setup() {
@@ -700,7 +700,7 @@ void executeCommand(String &cmdLine) {
     print_status();
     print_freq_map();
     
-  } else if (cmd == F("snap")) {
+  } else if (cmd == F("snapshot")) {
     String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
     uint8_t sec = 5;  // Default 5 seconds
     if (args.length() > 0) {
@@ -708,7 +708,7 @@ void executeCommand(String &cmdLine) {
       if (sec < 1) sec = 1;
       if (sec > 60) sec = 60;
     }
-    cmd_snap(sec);
+    cmd_snapshot(sec);
     
   } else if (cmd == F("scan")) {
     // scan <channel> [seconds]
