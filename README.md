@@ -107,7 +107,7 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
 ### Jamming Modes Visualized
 
 ```
-2.4 GHz ISM Band
+                               2.4 GHz ISM Band
 2400                                                                      2483 MHz
  │                                                                           │
  ├───────────────────────────────────────────────────────────────────────────┤
