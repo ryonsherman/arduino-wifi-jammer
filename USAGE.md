@@ -22,8 +22,8 @@ status               Show slave distribution and frequencies
 COMMAND DETAILS
 ================================================================================
 
-1. help
------------
+### 1. help
+
 Display all available commands and usage examples.
 
 Usage: help
@@ -39,8 +39,8 @@ Output:
   - status: Show slave distribution and frequency map
 
 
-2. get [ids]
------------
+### 2. get [ids]
+
 Query configuration of specific slaves or all slaves.
 
 Usage: get [ids]
@@ -62,8 +62,8 @@ Output Format:
   Slave 12 [ACTIVE] Mode: Custom
 
 
-3. set <distribution>
------------
+### 3. set \<distribution\>
+
 Configure custom channel distribution pattern.
 
 Usage: set <distribution>
@@ -98,8 +98,8 @@ Distribution Syntax Rules:
 - Slaves not assigned become idle (not transmitting)
 
 
-4. channel <n>
------------
+### 4. channel \<n\>
+
 Set single channel mode or full spectrum mode.
 
 Usage: channel <n>
@@ -119,8 +119,8 @@ Frequency Mapping:
 - Full Spectrum (0): 2415-2470 MHz (5MHz spacing)
 
 
-5. start
------------
+### 5. start
+
 Begin transmission with current configuration.
 
 Usage: start
@@ -137,8 +137,8 @@ Notes:
 - All active slaves transmit simultaneously
 
 
-6. stop
------------
+### 6. stop
+
 Halt transmission but keep configuration.
 
 Usage: stop
@@ -155,8 +155,8 @@ Notes:
 - Physical restart (power cycle) clears config
 
 
-7. status
------------
+### 7. status
+
 Show current slave distribution and frequency map.
 
 Usage: status
@@ -193,16 +193,16 @@ Example Output:
 MODES OVERVIEW
 ================================================================================
 
-SINGLE CHANNEL MODE
------------
+### SINGLE CHANNEL MODE
+
 All active slaves transmit on the same channel frequency.
 Best for: Maximum power density on one channel
 
 Usage: channel <1-13>
 Example: channel 6 -> All slaves on 2427 MHz
 
-FULL SPECTRUM MODE
------------
+### FULL SPECTRUM MODE
+
 Slaves spread across 60MHz span (2415-2470 MHz).
 Best for: Wide coverage across multiple channels
 
@@ -214,8 +214,8 @@ Frequency distribution:
   ...
   Slave 12: 2470 MHz
 
-CUSTOM DISTRIBUTION MODE
------------
+### CUSTOM DISTRIBUTION MODE
+
 Flexible assignment of slaves to specific channels.
 Best for: Targeted jamming of specific channels
 
