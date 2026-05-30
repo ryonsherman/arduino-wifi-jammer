@@ -15,14 +15,11 @@ This system creates a coordinated jamming swarm that can:
 
 ### Master Node (1x)
 - Arduino Nano x1
-- NRF24L01+ module x1 (RX mode, future spectrum analyzer)
 - USB serial connection to PC
 
 ### Slave Nodes (12x)
 - MH-Tiny (ATtiny88) clone x12 — or Digispark (ATtiny85) with USI 2-pin mod
 - NRF24L01+ module x12 (TX mode)
-- I2C connection to master
-- Power source (USB or battery)
 
 ### Components Bill of Materials
 
@@ -30,7 +27,7 @@ This system creates a coordinated jamming swarm that can:
 |------|----------|-------|--------------|
 | Arduino Nano (master) | 1 | ~$15 for 3 units | ~$5 |
 | MH-Tiny ATtiny88 (slaves) | 12 | ~$22 for 10 units | ~$27 |
-| NRF24L01+ module | 13 | Breakout board optional | ~$65 |
+| NRF24L01+ module | 12 | Breakout board optional | ~$60 |
 | 10uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 0.1uF capacitor | 13 | ~$5 for 20 units | ~$3 |
 | 9V battery (USB rechargeable) | 4 | ~$20 for 4 units | ~$20 |
@@ -107,7 +104,6 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
 ## Software Components
 
 ### Master Controller (`Master_Swarm_Controller.ino`)
-Main control node with USB Serial interface for commands.
 
 **Commands:**
 - `help` - Display command list
@@ -308,7 +304,6 @@ if (target > 2527) target = 2527;
 ### Planned Features
 - **Button Input**: Replace USB serial with physical buttons for command entry
 - **OLED Display**: Real-time status display on master node
-- **Spectrum Analyzer**: NRF24L01+ RX-only module for real-time frequency analysis
 - **Auto-Distribution**: Intelligent channel allocation based on detected activity
 - **Power Management**: Sleep modes for battery operation
 - **LED Indicators**: Visual feedback for jamming status
@@ -324,7 +319,7 @@ if (target > 2527) target = 2527;
 ```
 wifi-jammer/
 ├── Master_Swarm_Controller/
-│   └── Master_Swarm_Controller.ino    # Master firmware (Arduino Nano + RF24)
+│   └── Master_Swarm_Controller.ino    # Master firmware (Arduino Nano)
 ├── Slave_Transmitter/
 │   └── Slave_Transmitter.ino          # Slave firmware (ATtiny88/85 + NRFLite)
 ├── Makefile                           # Multi-target compile/upload
@@ -352,9 +347,6 @@ arduino-cli core install ATTinyCore:avr
 ### Arduino Libraries
 
 ```sh
-# Install NRF24 library (Master - Arduino Nano)
-arduino-cli lib install RF24
-
 # Install NRFLite library (Slave - ATtiny88 / ATtiny85)
 arduino-cli lib install NRFLite
 ```
@@ -363,9 +355,7 @@ arduino-cli lib install NRFLite
 
 | Library | Used By | Built-in? |
 |---------|---------|-----------|
-| `SPI.h` | Master (Nano) | Yes |
 | `Wire.h` | Master & Slave | Yes (via core) |
-| `RF24.h` (TMRh20) | Master | No — install above |
 | `NRFLite.h` (dparson55) | Slave | No — install above |
 
 ### NRF24L01+ Module

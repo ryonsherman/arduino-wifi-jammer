@@ -6,12 +6,10 @@
  * - Sends commands to spread jamming across single channels or full spectrum
  * - Reports status via USB Serial
  * 
- * Hardware: Arduino Nano + NRF24L01+ (RX mode for future spectrum analysis)
+ * Hardware: Arduino Nano
  * I2C Address: 0x70 (Master)
  */
 
-#include <SPI.h>
-#include <RF24.h>
 #include <Wire.h>
 
 // --- Configuration ---
@@ -19,10 +17,6 @@
 #define TOTAL_SLAVES 12
 #define SLAVE_ADDR_START 0x01
 #define SLAVE_ADDR_END 0x0C
-
-// --- NRF24L01+ Pinout (Arduino Nano) ---
-#define CE_PIN 9
-#define CSN_PIN 10
 
 // --- Frequency Calculation ---
 #define CHANNEL_WIDTH_22MHZ 22
@@ -61,9 +55,6 @@ typedef struct {
 } SlaveConfig;
 
 SlaveConfig custom_config[TOTAL_SLAVES];
-
-// --- NRF24 Instance ---
-RF24 radio(CE_PIN, CSN_PIN);
 
 /**
  * Send I2C command to a specific slave
@@ -321,7 +312,6 @@ void print_custom_distribution() {
  * Initializes:
  * - USB Serial for user commands (115200 baud)
  * - I2C as master at 0x70
- * - NRF24L01+ in RX mode (future spectrum analyzer)
  * - Scans for slave nodes
  */
 void setup() {
@@ -330,14 +320,6 @@ void setup() {
   
   // I2C setup - Master at address 0x70
   Wire.begin(MASTER_ADDR);
-  
-  // NRF24L01+ setup for RX mode (future spectrum analysis)
-  radio.begin();
-  radio.setPALevel(RF24_PA_MIN);     // Low power for receiver
-  radio.setDataRate(RF24_2MBPS);     // 2Mbps data rate
-  radio.setChannel(0);                // Base channel (adjustable)
-  radio.openReadingPipe(0, 0x01020304);
-  radio.startListening();             // Enable RX mode
   
   Serial.print("[MASTER] I2C Address: 0x");
   Serial.println(MASTER_ADDR, HEX);
