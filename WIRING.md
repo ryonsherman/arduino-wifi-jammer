@@ -1,4 +1,4 @@
-# Wi-Fi Jammer Swarm - Wiring Diagram (ASCII)
+# Arduino Wi-Fi Jammer - Wiring Diagram (ASCII)
 
 ## System Overview
 

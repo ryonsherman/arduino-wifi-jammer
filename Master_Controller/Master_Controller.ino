@@ -12,6 +12,7 @@
 
 #include <Wire.h>
 #include <SPI.h>
+#include <EEPROM.h>
 
 // --- Configuration ---
 #define MASTER_ADDR 0x70
@@ -19,6 +20,7 @@
 
 // --- Hardware Switch ---
 #define HW_SWITCH_PIN 2  // D2 - connect switch between D2 and GND
+#define HW_SWEEP_PIN 3   // D3 - sweep mode (position 3 of ON-OFF-ON)
 
 // --- NRF24L01+ RX Scanner ---
 #define NRF_CE_PIN 9
@@ -50,6 +52,7 @@ static void nrf_write_reg(uint8_t reg, uint8_t val) {
 #define MODE_SINGLE_CHANNEL 1
 #define MODE_FULL_SPECTRUM 2
 #define MODE_CUSTOM 3
+#define MODE_SWEEP 4
 
 // --- Commands ---
 #define CMD_START 1
@@ -67,6 +70,33 @@ static bool hw_jamming_active = false;  // Hardware switch state
 static uint32_t last_status_ms = 0;
 static uint8_t current_power = 3;  // 0=MIN, 1=LOW, 2=HIGH, 3=MAX (default)
 
+// Slave health cache (populated by poll_slaves)
+static bool slave_online[TOTAL_SLAVES];
+static uint8_t slave_rtt_us[TOTAL_SLAVES];
+
+// Adaptive jamming state
+static bool adaptive_active = false;
+static uint16_t adaptive_interval_sec = 30;
+static uint8_t adaptive_threshold = 0;
+static uint32_t last_adaptive_ms = 0;
+
+// Sweep mode state
+static bool hw_sweep_active = false;   // D3 LOW = sweep via HW switch
+static bool sweep_active = false;      // sweep via software command
+static uint8_t sweep_channel = 1;      // current sweep position
+static uint16_t sweep_dwell_ms = 200;  // ms per channel
+static uint32_t last_sweep_ms = 0;
+
+// Burst pattern state
+static uint8_t current_pattern = 0;    // 0=continuous, 1=pulsed, 2=random, 3=burst
+static uint16_t pattern_on_ms = 50;    // on time (ms)
+static uint16_t pattern_off_ms = 50;   // off time (ms)
+static bool pattern_state = true;      // true=on, false=off
+static uint32_t pattern_timer = 0;
+
+// Scan threshold
+static uint8_t scan_threshold = 50;  // default 50%
+
 // Packed slave config: 4 bytes per slave instead of 4 (struct padding eliminated)
 // Layout: [channel:4bits][active:1bit][unused:3bits] = 1 byte per slave
 static uint8_t slave_cfg[TOTAL_SLAVES];  // Was 48 bytes (struct), now 12 bytes
@@ -74,12 +104,138 @@ static uint8_t slave_cfg[TOTAL_SLAVES];  // Was 48 bytes (struct), now 12 bytes
 // Bounds-checked config access macros (WARN-2 fix)
 #define CFG_GET_CHANNEL(i)  ((i) < TOTAL_SLAVES ? (slave_cfg[i] >> 4) : 0)
 #define CFG_GET_ACTIVE(i)   ((i) < TOTAL_SLAVES ? (slave_cfg[i] & 0x01) : 0)
+
+// Profile presets (stored in EEPROM)
+#define PROFILE_MAGIC      0x4A
+#define OFFSET_PROF_COUNT  1
+#define OFFSET_PROFILES    2
+#define PROFILE_NAME_LEN   16
+#define PROFILE_SIZE       (1 + 1 + TOTAL_SLAVES + PROFILE_NAME_LEN)  // mode, channel, cfg, name
+
+static uint16_t profile_offset(uint8_t idx) {
+  return OFFSET_PROFILES + idx * PROFILE_SIZE;
+}
+static void profile_init(void) {
+  if (EEPROM.read(0) != PROFILE_MAGIC) { EEPROM.write(0, PROFILE_MAGIC); EEPROM.write(OFFSET_PROF_COUNT, 0); }
+}
+static uint8_t profile_count(void) { return EEPROM.read(OFFSET_PROF_COUNT); }
 #define CFG_SET(i, ch, act) do { if ((i) < TOTAL_SLAVES) slave_cfg[i] = (((ch) & 0x0F) << 4) | ((act) ? 1 : 0); } while(0)
+
+// ── Profile Presets (EEPROM-backed) ──────────────────────────────
+static void trim_str(char* s) {
+  char* p = s;
+  while (*p == ' ') p++;
+  if (p != s) { memmove(s, p, strlen(p) + 1); }
+  for (int i = strlen(s) - 1; i >= 0 && s[i] == ' '; i--) s[i] = 0;
+}
+static bool profile_write(uint8_t idx, const char* name) {
+  uint16_t off = profile_offset(idx);
+  EEPROM.write(off++, current_mode);
+  EEPROM.write(off++, selected_channel);
+  for (uint8_t i = 0; i < TOTAL_SLAVES; i++) EEPROM.write(off++, slave_cfg[i]);
+  for (uint8_t i = 0; i < PROFILE_NAME_LEN; i++) EEPROM.write(off++, name[i] ? name[i] : 0);
+  return true;
+}
+static bool profile_name_match(uint8_t idx, const char* name) {
+  uint16_t off = profile_offset(idx) + 2 + TOTAL_SLAVES;
+  for (uint8_t i = 0; i < PROFILE_NAME_LEN; i++) {
+    uint8_t c = EEPROM.read(off++);
+    if (c != (uint8_t)name[i]) return false;
+    if (c == 0 && name[i] == 0) return true;
+  }
+  return true;
+}
+static void profile_load(uint8_t idx) {
+  uint16_t off = profile_offset(idx);
+  current_mode = EEPROM.read(off++);
+  selected_channel = EEPROM.read(off++);
+  for (uint8_t i = 0; i < TOTAL_SLAVES; i++) slave_cfg[i] = EEPROM.read(off++);
+}
+static uint8_t find_profile(const char* name) {
+  uint8_t cnt = profile_count();
+  for (uint8_t i = 0; i < cnt; i++) if (profile_name_match(i, name)) return i;
+  return 255;
+}
+static bool profile_save(const char* name) {
+  profile_init();
+  uint8_t cnt = profile_count();
+  for (uint8_t i = 0; i < cnt; i++) { if (profile_name_match(i, name)) { profile_write(i, name); return true; } }
+  if (cnt >= 16) return false;
+  profile_write(cnt, name);
+  EEPROM.write(OFFSET_PROF_COUNT, cnt + 1);
+  return true;
+}
+static bool profile_delete_at(uint8_t idx) {
+  uint8_t cnt = profile_count();
+  if (idx >= cnt) return false;
+  for (uint8_t i = idx; i < cnt - 1; i++) {
+    uint16_t src = profile_offset(i + 1);
+    uint16_t dst = profile_offset(i);
+    for (uint8_t b = 0; b < PROFILE_SIZE; b++) EEPROM.write(dst++, EEPROM.read(src++));
+  }
+  EEPROM.write(OFFSET_PROF_COUNT, cnt - 1);
+  return true;
+}
+static void cmd_profile(const char* rest) {
+  char name[PROFILE_NAME_LEN];
+  if (!rest || rest[0] == 0) { profile_list(); return; }
+  if (strncmp_P(rest, PSTR("save "), 5) == 0) {
+    if (rest[5] == 0) { Serial.println(F("Usage: profile save <name>")); return; }
+    strncpy(name, rest + 5, PROFILE_NAME_LEN - 1); name[PROFILE_NAME_LEN - 1] = 0;
+    trim_str(name);
+    if (name[0] == 0) { Serial.println(F("Invalid name")); return; }
+    if (profile_save(name)) { Serial.print(F("Profile '")); Serial.print(name); Serial.println(F("' saved")); }
+    else { Serial.println(F("Max 16 profiles")); }
+  } else if (strncmp_P(rest, PSTR("load "), 5) == 0) {
+    if (rest[5] == 0) { Serial.println(F("Usage: profile load <name>")); return; }
+    strncpy(name, rest + 5, PROFILE_NAME_LEN - 1); name[PROFILE_NAME_LEN - 1] = 0;
+    trim_str(name);
+    uint8_t idx = find_profile(name);
+    if (idx == 255) { Serial.print(F("Profile '")); Serial.print(name); Serial.println(F("' not found")); return; }
+    profile_load(idx);
+    Serial.print(F("Profile '")); Serial.print(name); Serial.println(F("' loaded"));
+  } else if (strncmp_P(rest, PSTR("delete "), 7) == 0) {
+    if (rest[7] == 0) { Serial.println(F("Usage: profile delete <name>")); return; }
+    strncpy(name, rest + 7, PROFILE_NAME_LEN - 1); name[PROFILE_NAME_LEN - 1] = 0;
+    trim_str(name);
+    uint8_t idx = find_profile(name);
+    if (idx == 255) { Serial.print(F("Profile '")); Serial.print(name); Serial.println(F("' not found")); return; }
+    profile_delete_at(idx);
+    Serial.print(F("Profile '")); Serial.print(name); Serial.println(F("' deleted"));
+  } else if (strcmp_P(rest, PSTR("list")) == 0) {
+    profile_list();
+  } else {
+    Serial.println(F("profile [save|load|delete|list]"));
+  }
+}
+static void profile_list(void) {
+  profile_init();
+  uint8_t cnt = profile_count();
+  if (cnt == 0) { Serial.println(F("No saved profiles")); return; }
+  Serial.println(F("Saved profiles:"));
+  for (uint8_t i = 0; i < cnt; i++) {
+    uint16_t off = profile_offset(i);
+    uint8_t mode = EEPROM.read(off++);
+    uint8_t ch = EEPROM.read(off++);
+    Serial.write(' ');
+    for (uint8_t j = 0; j < PROFILE_NAME_LEN; j++) {
+      uint8_t c = EEPROM.read(off + TOTAL_SLAVES + j);
+      if (c == 0) break;
+      Serial.write(c);
+    }
+    Serial.print(F("  ("));
+    if (mode == MODE_SINGLE_CHANNEL) { Serial.print(F("ch")); Serial.print(ch); }
+    else if (mode == MODE_FULL_SPECTRUM) { Serial.print(F("full")); }
+    else { Serial.print(F("custom")); }
+    Serial.println(')');
+  }
+}
 
 /**
  * Send I2C command to a specific slave
  * Byte 4 packs local_idx (high nibble) + group_size (low nibble) for fan-out
  * Byte 5: power level (0=MIN, 1=LOW, 2=HIGH, 3=MAX)
+ * Byte 6: pattern_type (0=continuous, 1=pulsed, 2=random, 3=burst)
  */
 static void send_cmd(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cmd, uint8_t local_idx, uint8_t group_size) {
   Wire.beginTransmission(SLAVE_ADDR_START + slave_id);
@@ -88,6 +244,7 @@ static void send_cmd(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cm
   Wire.write(cmd);
   Wire.write(((local_idx & 0x0F) << 4) | (group_size & 0x0F));
   Wire.write(current_power);
+  Wire.write(current_pattern);
   Wire.endTransmission();
 }
 
@@ -164,7 +321,7 @@ static uint8_t scan_slaves() {
  * Uses local fan-out formula: center + (local_idx * 2) - (group_size - 1)
  */
 static uint8_t calc_freq(uint8_t local_idx, uint8_t group_size, uint8_t mode, uint8_t channel) {
-  if (mode == MODE_SINGLE_CHANNEL || mode == MODE_CUSTOM) {
+  if (mode == MODE_SINGLE_CHANNEL || mode == MODE_CUSTOM || mode == MODE_SWEEP) {
     // center = 12 + (ch-1)*5 = 7 + ch*5
     // offset = (local_idx * 2) - (group_size - 1)
     // freq = center + offset = 7 + ch*5 + local_idx*2 - group_size + 1 = 8 + ch*5 + local_idx*2 - group_size
@@ -387,11 +544,20 @@ static void print_freq_map() {
     Serial.println(selected_channel);
   } else if (current_mode == MODE_FULL_SPECTRUM) {
     Serial.println(F("Mode: Full Spectrum"));
+  } else if (current_mode == MODE_SWEEP) {
+    Serial.print(F("Mode: Sweep ch"));
+    Serial.print(sweep_channel);
+    Serial.print(F(", dwell "));
+    Serial.print(sweep_dwell_ms);
+    Serial.println(F("ms"));
   } else {
     Serial.println(F("Mode: Custom"));
   }
   
-  if (current_mode == MODE_CUSTOM) {
+  if (current_mode == MODE_SWEEP) {
+    Serial.print(F("All slaves sweeping ch1-13, currently ch"));
+    Serial.println(sweep_channel);
+  } else if (current_mode == MODE_CUSTOM) {
     // Two-pass for custom mode: count then print
     uint8_t group_size[14] = {0};  // 14 bytes stack (channels 1-13, index 0 unused)
     
@@ -454,10 +620,12 @@ static void print_status() {
     Serial.println(selected_channel);
   } else if (current_mode == MODE_FULL_SPECTRUM) {
     Serial.println(F("Channel: All (spectrum)"));
+  } else if (current_mode == MODE_SWEEP) {
+    Serial.print(F("Sweep ch"));
+    Serial.println(sweep_channel);
   } else {
-    // Custom - list unique channels
     Serial.print(F("Channels: "));
-    uint16_t seen = 0;  // Bitmask for channels 1-13
+    uint16_t seen = 0;
     bool first = true;
     for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
       if (CFG_GET_ACTIVE(i)) {
@@ -472,6 +640,54 @@ static void print_status() {
     }
     Serial.println();
   }
+  
+  // Show sweep/switch status
+  if (hw_sweep_active) {
+    Serial.println(F("Switch: SWEEP (position 3)"));
+  } else if (sweep_active) {
+    Serial.println(F("Mode: Sweep"));
+  }
+  
+  // Show current pattern
+  if (current_pattern == 0) Serial.println(F("Pattern: continuous"));
+  else if (current_pattern == 1) { Serial.print(F("Pattern: pulsed ")); Serial.print(pattern_on_ms); Serial.println(F("ms")); }
+  else if (current_pattern == 2) Serial.println(F("Pattern: random"));
+  else if (current_pattern == 3) { Serial.print(F("Pattern: burst ")); Serial.print(pattern_on_ms); Serial.print(F("/")); Serial.print(pattern_off_ms); Serial.println(F("ms")); }
+  
+  // Per-slave health
+  Serial.println(F("\n-- Slaves --"));
+  uint8_t online = 0;
+  for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+    uint8_t ch;
+    if (current_mode == MODE_FULL_SPECTRUM) {
+      ch = 14 + i * 5;
+    } else if (current_mode == MODE_SINGLE_CHANNEL || current_mode == MODE_SWEEP) {
+      ch = selected_channel;
+    } else {
+      ch = CFG_GET_CHANNEL(i);
+    }
+    
+    Serial.print(F("  #"));
+    Serial.print(i + 1);
+    Serial.print(F(" 0x"));
+    if (SLAVE_ADDR_START + i < 0x10) Serial.write('0');
+    Serial.print(SLAVE_ADDR_START + i, HEX);
+    Serial.write(' ');
+    
+    if (slave_online[i]) {
+      Serial.print(F("CH "));
+      if (ch < 10) Serial.write(' ');
+      Serial.print(ch);
+      Serial.print(F("  [OK] "));
+      Serial.print(slave_rtt_us[i]);
+      Serial.println(F("us"));
+      online++;
+    } else {
+      Serial.println(F("--  [OFFLINE]"));
+    }
+  }
+  Serial.print(online);
+  Serial.println(F("/12 online"));
 }
 
 /**
@@ -480,8 +696,17 @@ static void print_status() {
 static void poll_slaves() {
   uint8_t active = 0;
   for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+    uint32_t t0 = micros();
     Wire.requestFrom((uint8_t)(SLAVE_ADDR_START + i), (uint8_t)1);
-    if (Wire.available() && Wire.read()) active++;
+    uint16_t elapsed = (uint16_t)(micros() - t0);
+    if (Wire.available()) {
+      slave_online[i] = true;
+      slave_rtt_us[i] = elapsed > 255 ? 255 : (uint8_t)elapsed;
+      if (Wire.read()) active++;
+    } else {
+      slave_online[i] = false;
+      slave_rtt_us[i] = 255;
+    }
   }
   
   Serial.print(F("[STATUS] "));
@@ -499,6 +724,217 @@ static void poll_slaves() {
 }
 
 /**
+ * Cancel adaptive jamming mode (called by mode-changing commands)
+ */
+static void stop_sweep(void);
+static void cancel_adaptive() {
+  if (adaptive_active) {
+    adaptive_active = false;
+    Serial.println(F("Adaptive mode cancelled"));
+  }
+  if (sweep_active) {
+    stop_sweep();
+  }
+}
+
+/**
+ * Quick scan of all 13 Wi-Fi channels, reports those above threshold
+ */
+static void cmd_scan_threshold(void) {
+  if (!nrf_scan_init()) return;
+  Serial.println(F("\nScanning all channels..."));
+  uint16_t counts[14] = {0};
+  uint16_t passes = 0;
+  uint32_t start = millis();
+  while (millis() - start < 2000) {
+    for (uint8_t ch = 1; ch <= 13; ch++) {
+      if (nrf_scan_channel(7 + ch * 5)) counts[ch]++;
+    }
+    passes++;
+  }
+  digitalWrite(NRF_CE_PIN, LOW);
+  SPI.endTransaction();
+  SPI.end();
+  Serial.println(F("Channels above threshold:"));
+  uint8_t found = 0;
+  for (uint8_t ch = 1; ch <= 13; ch++) {
+    uint8_t pct = passes > 0 ? (uint32_t)counts[ch] * 100 / passes : 0;
+    if (pct >= scan_threshold) {
+      if (ch < 10) Serial.write(' ');
+      Serial.print(ch);
+      Serial.print(F("  "));
+      Serial.print(2400 + 7 + ch * 5);
+      Serial.print(F(" MHz "));
+      for (uint8_t i = 0; i < 10; i++) Serial.print(i * 10 < pct ? '#' : '.');
+      Serial.print(F(" "));
+      Serial.print(pct);
+      Serial.println(F("%"));
+      found++;
+    }
+  }
+  if (found == 0) Serial.println(F("  None"));
+  Serial.print(F("Threshold: "));
+  Serial.print(scan_threshold);
+  Serial.println(F("% (scan threshold <n> to change)"));
+}
+
+/**
+ * Run one adaptive cycle: stop jamming, scan all 13 Wi-Fi channels,
+ * assign slaves to busiest channels, resume jamming.
+ */
+static void cmd_adaptive() {
+  // Stop jamming first so slave NRFs don't pollute the scan
+  if (jamming_active) {
+    send_cmd_all(current_mode, selected_channel, CMD_STOP);
+    jamming_active = false;
+    delay(50);
+  }
+
+  if (!nrf_scan_init()) {
+    Serial.println(F("NRF24L01+ not available"));
+    return;
+  }
+
+  Serial.println(F("\nAdaptive scanning..."));
+
+  uint16_t counts[14] = {0};
+  uint16_t passes = 0;
+  uint32_t start = millis();
+  uint8_t last_dot = 0;
+
+  while (millis() - start < 2000) {
+    for (uint8_t ch = 1; ch <= 13; ch++) {
+      if (nrf_scan_channel(7 + ch * 5)) counts[ch]++;
+    }
+    passes++;
+
+    uint8_t s = (millis() - start) / 1000;
+    if (s > last_dot) { Serial.print('.'); last_dot = s; }
+  }
+
+  digitalWrite(NRF_CE_PIN, LOW);
+  SPI.endTransaction();
+  SPI.end();
+  Serial.println(F(" done"));
+
+  // Convert to percentages in-place
+  for (uint8_t ch = 1; ch <= 13; ch++) {
+    counts[ch] = passes > 0 ? (uint32_t)counts[ch] * 100 / passes : 0;
+  }
+
+  // Sort channels descending by activity (simple insertion)
+  uint8_t sorted[13] = {1,2,3,4,5,6,7,8,9,10,11,12,13};
+  for (uint8_t i = 0; i < 12; i++) {
+    for (uint8_t j = i + 1; j < 13; j++) {
+      if (counts[sorted[j]] > counts[sorted[i]]) {
+        uint8_t t = sorted[i]; sorted[i] = sorted[j]; sorted[j] = t;
+      }
+    }
+  }
+
+  // Select channels: above threshold, or top N
+  uint8_t selected[12];
+  uint8_t num = 0;
+
+  if (adaptive_threshold > 0) {
+    for (uint8_t i = 0; i < 13 && num < 12; i++) {
+      if (counts[sorted[i]] >= adaptive_threshold) {
+        selected[num++] = sorted[i];
+      }
+    }
+    if (num == 0) {
+      Serial.println(F("No channels above threshold, switching to full spectrum"));
+      current_mode = MODE_FULL_SPECTRUM;
+      send_cmd_all(MODE_FULL_SPECTRUM, 0, CMD_START);
+      jamming_active = true;
+      if (adaptive_active) {
+        last_adaptive_ms = millis();
+        Serial.print(F("Adaptive jamming active (rescan every "));
+        Serial.print(adaptive_interval_sec);
+        Serial.println(F("s)"));
+      }
+      return;
+    }
+  } else {
+    num = 12;
+    for (uint8_t i = 0; i < 12; i++) selected[i] = sorted[i];
+  }
+
+  // Assign slaves
+  memset(slave_cfg, 0, TOTAL_SLAVES);
+  for (uint8_t i = 0; i < num; i++) CFG_SET(i, selected[i], true);
+
+  current_mode = MODE_CUSTOM;
+
+  // Print results
+  if (adaptive_threshold > 0) {
+    Serial.print(F("Targeting "));
+    Serial.print(num);
+    Serial.print(F(" channels >= "));
+    Serial.print(adaptive_threshold);
+    Serial.println(F("%"));
+  } else {
+    Serial.print(F("Targeting "));
+    Serial.print(num);
+    Serial.println(F(" busiest channels"));
+  }
+  Serial.print(F("Channels: "));
+  for (uint8_t i = 0; i < num; i++) {
+    if (i > 0) Serial.print(F(", "));
+    Serial.print(selected[i]);
+    Serial.print(F(" ("));
+    Serial.print(counts[selected[i]]);
+    Serial.print(F("%)"));
+  }
+  Serial.println();
+
+  send_custom_cmds(CMD_START);
+  jamming_active = true;
+
+  if (adaptive_active) {
+    last_adaptive_ms = millis();
+    Serial.print(F("Adaptive jamming active (rescan every "));
+    Serial.print(adaptive_interval_sec);
+    Serial.println(F("s)"));
+  } else {
+    Serial.println(F("Adaptive jamming started (one-shot)"));
+  }
+}
+
+// ── Sweep Mode ──────────────────────────────
+static void advance_sweep(void) {
+  sweep_channel++;
+  if (sweep_channel > 13) sweep_channel = 1;
+  selected_channel = sweep_channel;
+  send_cmd_all(MODE_SWEEP, sweep_channel, CMD_START);
+  Serial.print(F("Sweep ch"));
+  Serial.println(sweep_channel);
+}
+
+static void start_sweep(void) {
+  cancel_adaptive();
+  sweep_active = true;
+  current_mode = MODE_SWEEP;
+  sweep_channel = 1;
+  selected_channel = 1;
+  last_sweep_ms = millis();
+  send_cmd_all(MODE_SWEEP, 1, CMD_START);
+  jamming_active = true;
+  Serial.println(F("Sweep mode started"));
+}
+
+static void stop_sweep(void) {
+  if (sweep_active) {
+    sweep_active = false;
+    jamming_active = false;
+    send_cmd_all(MODE_SWEEP, 0, CMD_STOP);
+    Serial.println(F("Sweep stopped"));
+  }
+}
+
+
+
+/**
  * Print help menu
  */
 static void print_help() {
@@ -512,10 +948,29 @@ static void print_help() {
   Serial.println(F("status      - Show status & freq map"));
   Serial.println(F("snapshot    - RF snapshot 5s (default)"));
   Serial.println(F("snapshot 30 - RF snapshot 30s collection"));
-  Serial.println(F("scan 6      - Live scan ch 6, 10s (default)"));
-  Serial.println(F("scan 6 30   - Live scan ch 6 for 30s"));
-  Serial.println(F("power 1-4   - TX power (1=MIN, 2=LOW, 3=HIGH, 4=MAX)"));
+  Serial.println(F("scan             - Scan all ch, show above threshold"));
+  Serial.println(F("scan threshold N - Set scan threshold %"));
+  Serial.println(F("scan 6           - Live scan ch 6, 10s (default)"));
+  Serial.println(F("scan 6 30        - Live scan ch 6 for 30s"));
   Serial.println(F("power       - Show current power"));
+  Serial.println(F("adaptive          - One-shot: scan & target busiest channels"));
+  Serial.println(F("adaptive start    - Periodic adaptive jamming"));
+  Serial.println(F("adaptive stop     - Stop adaptive jamming"));
+  Serial.println(F("adaptive thresh N - Min activity % (0=auto)"));
+  Serial.println(F("adaptive intv N   - Rescan interval (sec)"));
+  Serial.println(F("profile list      - List saved profiles"));
+  Serial.println(F("profile save <n>  - Save current config as profile"));
+  Serial.println(F("profile load <n>  - Load a saved profile"));
+  Serial.println(F("profile delete <n>- Delete a profile"));
+  Serial.println(F("sweep             - Show sweep status"));
+  Serial.println(F("sweep start       - Start sweep mode"));
+  Serial.println(F("sweep stop        - Stop sweep mode"));
+  Serial.println(F("sweep 500         - Set dwell (10-5000ms)"));
+  Serial.println(F("pattern           - Show/set jamming pattern"));
+  Serial.println(F("pattern continuous - Continuous (default)"));
+  Serial.println(F("pattern pulsed 50 - Alternating on/off"));
+  Serial.println(F("pattern random    - Random freq hop"));
+  Serial.println(F("pattern burst 100 20 - Custom on/off"));
   Serial.println(F("======================================"));
 }
 
@@ -523,8 +978,9 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("\n=== MASTER CONTROLLER ==="));
   
-  // Initialize hardware switch pin (active LOW with internal pull-up)
+  // Initialize hardware switch pins (active LOW with internal pull-up)
   pinMode(HW_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(HW_SWEEP_PIN, INPUT_PULLUP);
   
   // Check NRF24L01+ RX module
   Serial.print(F("NRF24L01+: "));
@@ -555,33 +1011,58 @@ void setup() {
   print_help();
 }
 
+// ── Duplicate string helpers (B1 optimization) ────────────────────
+static void print_hw_switch_on() {
+    Serial.println(F("HW switch is ON - turn off to use software control"));
+}
+static void print_hw_sweep_on() {
+    Serial.println(F("HW sweep is ON - turn switch off to use software control"));
+}
+static void print_use_5_5000() {
+    Serial.println(F("Use 5-5000ms"));
+}
+static void print_usage_pattern_burst() {
+    Serial.println(F("Usage: pattern burst <on_ms> <off_ms>"));
+}
+
 /**
  * Parse and execute command
- * Optimized: avoid String concatenation, use F() macros
+ * Optimized: C-string parsing (A1), no String heap allocations, deduped F() literals (B1)
  */
 void executeCommand(String &cmdLine) {
   cmdLine.trim();
   if (cmdLine.length() == 0) return;
-  
-  // Extract command (first word)
-  int sp = cmdLine.indexOf(' ');
-  String cmd = (sp != -1) ? cmdLine.substring(0, sp) : cmdLine;
-  
-  if (cmd == F("help")) {
+
+  // Work on a mutable C-string copy (stack) — avoids String heap allocations
+  char buf[48];
+  cmdLine.toCharArray(buf, sizeof(buf));
+
+  // Split into command and args at first space
+  char *cmd = buf;
+  char *sp = strchr(buf, ' ');
+  char *args = NULL;
+  if (sp) {
+    *sp = '\0';
+    args = sp + 1;
+    // Skip leading spaces to match original substring(sp+1) behavior
+    while (*args == ' ') args++;
+    if (*args == '\0') args = NULL;
+  }
+
+  // Use strcmp_P to compare RAM-based cmd/args with flash-resident string literals
+  if (strcmp_P(cmd, PSTR("help")) == 0) {
     print_help();
-    
-  } else if (cmd == F("get")) {
-    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
-    if (args == F("all") || args.length() == 0) {
+
+  } else if (strcmp_P(cmd, PSTR("get")) == 0) {
+    if (!args || strcmp_P(args, PSTR("all")) == 0) {
       print_status();
       print_freq_map();
     } else {
-      // Parse comma-separated slave IDs
-      int pos = 0;
-      while (pos < (int)args.length()) {
-        int comma = args.indexOf(',', pos);
-        String s = (comma != -1) ? args.substring(pos, comma) : args.substring(pos);
-        uint8_t id = s.toInt();
+      // Parse comma-separated slave IDs using strtok_r (reentrant)
+      char *save;
+      char *token = strtok_r(args, ",", &save);
+      while (token) {
+        uint8_t id = atoi(token);
         if (id < TOTAL_SLAVES) {
           Serial.print(F("S"));
           Serial.print(id);
@@ -593,60 +1074,55 @@ void executeCommand(String &cmdLine) {
             Serial.println(CFG_GET_CHANNEL(id));
           }
         }
-        pos = (comma != -1) ? comma + 1 : args.length();
+        token = strtok_r(NULL, ",", &save);
       }
     }
-    
-  } else if (cmd == F("set")) {
-    if (hw_jamming_active) {
-      Serial.println(F("HW switch is ON - turn off to use software control"));
-      return;
-    }
+
+  } else if (strcmp_P(cmd, PSTR("set")) == 0) {
+    if (hw_jamming_active) { print_hw_switch_on(); return; }
+    if (hw_sweep_active) { print_hw_sweep_on(); return; }
+    cancel_adaptive();
     // Parse distribution: "4@1,2@6,2@11"
-    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
+    if (!args) return;
     uint8_t idx = 0;
-    int pos = 0;
-    
-    while (idx < TOTAL_SLAVES && pos < (int)args.length()) {
-      int comma = args.indexOf(',', pos);
-      String seg = (comma != -1) ? args.substring(pos, comma) : args.substring(pos);
-      int at = seg.indexOf('@');
-      
-      if (at != -1) {
-        uint8_t count = seg.substring(0, at).toInt();
-        uint8_t ch = seg.substring(at + 1).toInt();
-        
+    char *save;
+    char *token = strtok_r(args, ",", &save);
+    while (idx < TOTAL_SLAVES && token) {
+      char *at = strchr(token, '@');
+      if (at) {
+        *at = '\0';
+        uint8_t count = atoi(token);
+        uint8_t ch = atoi(at + 1);
+
         if (ch < 1 || ch > 13) {
           Serial.print(F("Invalid ch: "));
           Serial.println(ch);
           return;
         }
-        
+
         for (uint8_t i = 0; i < count && idx < TOTAL_SLAVES; i++) {
           CFG_SET(idx, ch, true);
           idx++;
         }
       }
-      pos = (comma != -1) ? comma + 1 : args.length();
+      token = strtok_r(NULL, ",", &save);
     }
-    
+
     // Mark remaining as idle
     for (uint8_t i = idx; i < TOTAL_SLAVES; i++) {
       CFG_SET(i, 0, false);
     }
-    
+
     current_mode = MODE_CUSTOM;
     Serial.println(F("Custom dist set"));
     print_status();
-    
-  } else if (cmd == F("channel")) {
-    if (hw_jamming_active) {
-      Serial.println(F("HW switch is ON - turn off to use software control"));
-      return;
-    }
-    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
-    uint8_t ch = args.toInt();
-    
+
+  } else if (strcmp_P(cmd, PSTR("channel")) == 0) {
+    cancel_adaptive();
+    if (hw_jamming_active) { print_hw_switch_on(); return; }
+    if (hw_sweep_active) { print_hw_sweep_on(); return; }
+    uint8_t ch = args ? atoi(args) : 0;
+
     if (ch >= 1 && ch <= 13) {
       current_mode = MODE_SINGLE_CHANNEL;
       selected_channel = ch;
@@ -663,17 +1139,16 @@ void executeCommand(String &cmdLine) {
     } else {
       Serial.println(F("Use 0-13"));
     }
-    
-  } else if (cmd == F("start")) {
-    if (hw_jamming_active) {
-      Serial.println(F("HW switch is ON - turn off to use software control"));
-      return;
-    }
+
+  } else if (strcmp_P(cmd, PSTR("start")) == 0) {
+    cancel_adaptive();
+    if (hw_jamming_active) { print_hw_switch_on(); return; }
+    if (hw_sweep_active) { print_hw_sweep_on(); return; }
     if (slave_count == 0) {
       Serial.println(F("No slaves"));
       return;
     }
-    
+
     Serial.println(F("Starting..."));
     if (current_mode == MODE_CUSTOM) {
       send_custom_cmds(CMD_START);
@@ -682,17 +1157,16 @@ void executeCommand(String &cmdLine) {
     }
     jamming_active = true;
     print_freq_map();
-    
-  } else if (cmd == F("stop")) {
-    if (hw_jamming_active) {
-      Serial.println(F("HW switch is ON - turn off to use software control"));
-      return;
-    }
+
+  } else if (strcmp_P(cmd, PSTR("stop")) == 0) {
+    cancel_adaptive();
+    if (hw_jamming_active) { print_hw_switch_on(); return; }
+    if (hw_sweep_active) { print_hw_sweep_on(); return; }
     if (!jamming_active) {
       Serial.println(F("Already stopped"));
       return;
     }
-    
+
     Serial.println(F("Stopping..."));
     if (current_mode == MODE_CUSTOM) {
       send_custom_cmds(CMD_STOP);
@@ -700,54 +1174,52 @@ void executeCommand(String &cmdLine) {
       send_cmd_all(current_mode, selected_channel, CMD_STOP);
     }
     jamming_active = false;
-    
-  } else if (cmd == F("status")) {
+
+  } else if (strcmp_P(cmd, PSTR("status")) == 0) {
     print_status();
     print_freq_map();
-    
-  } else if (cmd == F("snapshot")) {
-    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
+
+  } else if (strcmp_P(cmd, PSTR("snapshot")) == 0) {
     uint8_t sec = 5;  // Default 5 seconds
-    if (args.length() > 0) {
-      sec = args.toInt();
+    if (args) {
+      sec = atoi(args);
       if (sec < 1) sec = 1;
       if (sec > 60) sec = 60;
     }
     cmd_snapshot(sec);
-    
-  } else if (cmd == F("scan")) {
-    // scan <channel> [seconds]
-    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
-    args.trim();
-    
-    if (args.length() == 0) {
-      Serial.println(F("Usage: scan <channel> [seconds]"));
-      Serial.println(F("  channel: 1-13"));
-      Serial.println(F("  seconds: 1-60 (default 10)"));
-      return;
+
+  } else if (strcmp_P(cmd, PSTR("scan")) == 0) {
+    if (!args) {
+      cmd_scan_threshold();
+    } else if (strncmp_P(args, PSTR("threshold "), 10) == 0) {
+      uint8_t t = atoi(args + 10);
+      if (t > 100) t = 100;
+      scan_threshold = t;
+      Serial.print(F("Scan threshold set to "));
+      Serial.print(scan_threshold);
+      Serial.println(F("%"));
+    } else if (strcmp_P(args, PSTR("threshold")) == 0) {
+      Serial.print(F("Scan threshold: "));
+      Serial.println(scan_threshold);
+    } else {
+      // scan <channel> [seconds]
+      uint8_t ch = atoi(args);
+      uint8_t sec = 10;
+      char *sp2 = strchr(args, ' ');
+      if (sp2) {
+        sec = atoi(sp2 + 1);
+      }
+      if (ch < 1 || ch > 13) {
+        Serial.println(F("Channel must be 1-13"));
+        return;
+      }
+      if (sec < 1) sec = 1;
+      if (sec > 60) sec = 60;
+      cmd_scan_channel(ch, sec);
     }
-    
-    // Parse channel and optional seconds
-    int sp2 = args.indexOf(' ');
-    uint8_t ch = args.toInt();
-    uint8_t sec = 10;  // Default
-    
-    if (sp2 != -1) {
-      sec = args.substring(sp2 + 1).toInt();
-    }
-    
-    if (ch < 1 || ch > 13) {
-      Serial.println(F("Channel must be 1-13"));
-      return;
-    }
-    if (sec < 1) sec = 1;
-    if (sec > 60) sec = 60;
-    
-    cmd_scan_channel(ch, sec);
-    
-  } else if (cmd == F("power")) {
-    String args = (sp != -1) ? cmdLine.substring(sp + 1) : "";
-    if (args.length() == 0) {
+
+  } else if (strcmp_P(cmd, PSTR("power")) == 0) {
+    if (!args || args[0] == '\0') {
       Serial.print(F("Power: "));
       Serial.print(current_power + 1);
       Serial.print(F(" ("));
@@ -757,7 +1229,7 @@ void executeCommand(String &cmdLine) {
       else Serial.print(F("MAX"));
       Serial.println(F(")"));
     } else {
-      uint8_t p = args.toInt();
+      uint8_t p = atoi(args);
       if (p < 1 || p > 4) {
         Serial.println(F("Use 1-4 (1=MIN, 2=LOW, 3=HIGH, 4=MAX)"));
       } else {
@@ -766,7 +1238,154 @@ void executeCommand(String &cmdLine) {
         Serial.println(p);
       }
     }
-    
+
+  } else if (strcmp_P(cmd, PSTR("adaptive")) == 0) {
+    if (hw_jamming_active) {
+      Serial.println(F("HW switch is ON - turn off to use adaptive"));
+      return;
+    }
+    if (hw_sweep_active) {
+      Serial.println(F("HW sweep is ON - turn switch off to use adaptive"));
+      return;
+    }
+    if (!args || args[0] == '\0') {
+      cancel_adaptive();
+      cmd_adaptive();
+    } else if (strcmp_P(args, PSTR("start")) == 0) {
+      cancel_adaptive();
+      adaptive_active = true;
+      cmd_adaptive();
+    } else if (strcmp_P(args, PSTR("stop")) == 0) {
+      if (adaptive_active) {
+        adaptive_active = false;
+        if (jamming_active) {
+          send_cmd_all(current_mode, selected_channel, CMD_STOP);
+          jamming_active = false;
+        }
+        Serial.println(F("Adaptive jamming stopped"));
+      } else {
+        Serial.println(F("Adaptive mode not active"));
+      }
+    } else if (strncmp_P(args, PSTR("thresh"), 6) == 0) {
+      char *sp2 = strchr(args, ' ');
+      if (sp2) {
+        uint8_t t = atoi(sp2 + 1);
+        if (t > 100) t = 100;
+        adaptive_threshold = t;
+        Serial.print(F("Adaptive threshold set to "));
+        Serial.print(adaptive_threshold);
+        Serial.println(F("% (0=auto, pick top N)"));
+      } else {
+        Serial.print(F("Threshold: "));
+        Serial.println(adaptive_threshold);
+      }
+    } else if (strncmp_P(args, PSTR("intv"), 4) == 0) {
+      char *sp2 = strchr(args, ' ');
+      if (sp2) {
+        uint16_t s = atoi(sp2 + 1);
+        if (s < 5) s = 5;
+        if (s > 300) s = 300;
+        adaptive_interval_sec = s;
+        Serial.print(F("Rescan interval set to "));
+        Serial.print(adaptive_interval_sec);
+        Serial.println(F("s"));
+      } else {
+        Serial.print(F("Interval: "));
+        Serial.print(adaptive_interval_sec);
+        Serial.println(F("s"));
+      }
+    } else {
+      Serial.println(F("adaptive [start|stop|thresh N|intv N]"));
+    }
+
+  } else if (strcmp_P(cmd, PSTR("sweep")) == 0) {
+    if (!args || args[0] == '\0') {
+      if (sweep_active || hw_sweep_active) {
+        Serial.print(F("Sweep: "));
+        if (hw_sweep_active) Serial.print(F("HW "));
+        Serial.print(F("active, ch"));
+        Serial.print((hw_sweep_active || sweep_active) ? sweep_channel : 1);
+        Serial.print(F(", dwell "));
+        Serial.print(sweep_dwell_ms);
+        Serial.println(F("ms"));
+      } else {
+        Serial.println(F("Sweep inactive"));
+      }
+    } else if (strcmp_P(args, PSTR("stop")) == 0) {
+      if (hw_sweep_active) { Serial.println(F("HW sweep is ON - turn switch off")); return; }
+      stop_sweep();
+    } else if (strcmp_P(args, PSTR("start")) == 0) {
+      if (hw_sweep_active) { Serial.println(F("HW sweep is ON - turn switch off")); return; }
+      if (hw_jamming_active) { Serial.println(F("HW switch is ON - turn off")); return; }
+      cancel_adaptive();
+      start_sweep();
+    } else {
+      uint16_t ms = atoi(args);
+      if (ms >= 10 && ms <= 5000) {
+        sweep_dwell_ms = ms;
+        Serial.print(F("Sweep dwell set to "));
+        Serial.print(ms);
+        Serial.println(F("ms"));
+      } else {
+        Serial.println(F("Usage: sweep [start|stop|<dwell_ms>]"));
+      }
+    }
+
+  } else if (strcmp_P(cmd, PSTR("pattern")) == 0) {
+    if (!args || args[0] == '\0') {
+      Serial.print(F("Pattern: "));
+      if (current_pattern == 0) Serial.println(F("continuous"));
+      else if (current_pattern == 1) { Serial.print(F("pulsed ")); Serial.print(pattern_on_ms); Serial.println(F("ms")); }
+      else if (current_pattern == 2) Serial.println(F("random"));
+      else if (current_pattern == 3) { Serial.print(F("burst ")); Serial.print(pattern_on_ms); Serial.print(F("/")); Serial.print(pattern_off_ms); Serial.println(F("ms")); }
+    } else if (strcmp_P(args, PSTR("continuous")) == 0) {
+      current_pattern = 0;
+      Serial.println(F("Pattern: continuous"));
+    } else if (strncmp_P(args, PSTR("pulsed"), 6) == 0) {
+      char *sp2 = strchr(args, ' ');
+      if (sp2) {
+        uint16_t ms = atoi(sp2 + 1);
+        if (ms >= 5 && ms <= 5000) {
+          current_pattern = 1;
+          pattern_on_ms = ms;
+          pattern_off_ms = ms;
+          pattern_state = true;
+          pattern_timer = millis();
+          Serial.print(F("Pattern: pulsed ")); Serial.print(ms); Serial.println(F("ms"));
+        } else print_use_5_5000();
+      } else Serial.println(F("Usage: pattern pulsed <ms>"));
+    } else if (strcmp_P(args, PSTR("random")) == 0) {
+      current_pattern = 2;
+      Serial.println(F("Pattern: random"));
+    } else if (strncmp_P(args, PSTR("burst"), 5) == 0) {
+      char *sp2 = strchr(args, ' ');
+      if (sp2) {
+        char *sp3 = strchr(sp2 + 1, ' ');
+        if (sp3) {
+          uint16_t on = atoi(sp2 + 1);
+          uint16_t off = atoi(sp3 + 1);
+          if (on >= 5 && on <= 5000 && off >= 5 && off <= 5000) {
+            current_pattern = 3;
+            pattern_on_ms = on;
+            pattern_off_ms = off;
+            pattern_state = true;
+            pattern_timer = millis();
+            Serial.print(F("Pattern: burst ")); Serial.print(on); Serial.print(F("/")); Serial.print(off); Serial.println(F("ms"));
+          } else print_use_5_5000();
+        } else print_usage_pattern_burst();
+      } else print_usage_pattern_burst();
+    } else {
+      Serial.println(F("Usage: pattern [continuous|pulsed <ms>|random|burst <on> <off>]"));
+    }
+
+  } else if (strcmp_P(cmd, PSTR("profile")) == 0) {
+    // Trim leading spaces from args (or pass NULL if empty)
+    if (args) {
+      while (*args == ' ') args++;
+      if (*args == '\0') args = NULL;
+    }
+    cmd_profile(args);
+
   } else {
     Serial.print(F("Unknown: "));
     Serial.println(cmd);
@@ -778,23 +1397,74 @@ void executeCommand(String &cmdLine) {
  * Main loop
  */
 void loop() {
-  // Check hardware switch state
-  bool switch_on = (digitalRead(HW_SWITCH_PIN) == LOW);
+  // Check 3-position hardware switch state
+  bool switch_pos1 = (digitalRead(HW_SWITCH_PIN) == LOW);  // D2 LOW = position 1
+  bool switch_pos3 = (digitalRead(HW_SWEEP_PIN) == LOW);   // D3 LOW = position 3
   
-  if (switch_on && !hw_jamming_active) {
-    // Switch just turned ON - start full spectrum jamming
+  // --- Position 1: Full spectrum ---
+  if (switch_pos1 && !hw_jamming_active) {
+    cancel_adaptive();
+    if (hw_sweep_active) {
+      hw_sweep_active = false;
+      sweep_active = false;
+      send_cmd_all(MODE_SWEEP, 0, CMD_STOP);
+    }
     hw_jamming_active = true;
     current_mode = MODE_FULL_SPECTRUM;
     selected_channel = 0;
     send_cmd_all(MODE_FULL_SPECTRUM, 0, CMD_START);
     jamming_active = true;
-    Serial.println(F("\n[HW] Switch ON - full spectrum jamming started"));
-  } else if (!switch_on && hw_jamming_active) {
-    // Switch just turned OFF - stop jamming
+    Serial.println(F("\n[HW] Pos 1 - full spectrum jamming"));
+  } else if (!switch_pos1 && hw_jamming_active) {
     hw_jamming_active = false;
     send_cmd_all(current_mode, selected_channel, CMD_STOP);
     jamming_active = false;
-    Serial.println(F("\n[HW] Switch OFF - jamming stopped"));
+    Serial.println(F("\n[HW] Switch OFF"));
+  }
+  
+  // --- Position 3: Sweep (only if position 1 is not active) ---
+  if (!hw_jamming_active) {
+    if (switch_pos3 && !hw_sweep_active) {
+      cancel_adaptive();
+      hw_sweep_active = true;
+      current_mode = MODE_SWEEP;
+      sweep_channel = 1;
+      selected_channel = 1;
+      last_sweep_ms = millis();
+      send_cmd_all(MODE_SWEEP, 1, CMD_START);
+      jamming_active = true;
+      Serial.println(F("\n[HW] Pos 3 - sweep mode"));
+    } else if (!switch_pos3 && hw_sweep_active) {
+      hw_sweep_active = false;
+      sweep_active = false;
+      send_cmd_all(MODE_SWEEP, 0, CMD_STOP);
+      jamming_active = false;
+      Serial.println(F("\n[HW] Switch OFF"));
+    }
+  }
+  
+  // Sweep timer: advance channel periodically
+  if ((sweep_active || hw_sweep_active) && jamming_active) {
+    if (millis() - last_sweep_ms >= sweep_dwell_ms) {
+      last_sweep_ms = millis();
+      advance_sweep();
+    }
+  }
+  
+  // Pattern timing for pulsed/burst (master-driven START/STOP)
+  if (jamming_active && !hw_jamming_active && !hw_sweep_active && !sweep_active && (current_pattern == 1 || current_pattern == 3)) {
+    uint32_t now = millis();
+    if (pattern_state && now - pattern_timer >= pattern_on_ms) {
+      if (current_mode == MODE_CUSTOM) send_custom_cmds(CMD_STOP);
+      else send_cmd_all(current_mode, selected_channel, CMD_STOP);
+      pattern_state = false;
+      pattern_timer = now;
+    } else if (!pattern_state && now - pattern_timer >= pattern_off_ms) {
+      if (current_mode == MODE_CUSTOM) send_custom_cmds(CMD_START);
+      else send_cmd_all(current_mode, selected_channel, CMD_START);
+      pattern_state = true;
+      pattern_timer = now;
+    }
   }
   
   if (Serial.available()) {
@@ -806,6 +1476,10 @@ void loop() {
   if (jamming_active && millis() - last_status_ms >= STATUS_INTERVAL_MS) {
     last_status_ms = millis();
     poll_slaves();
+  }
+
+  if (adaptive_active && jamming_active && millis() - last_adaptive_ms >= (uint32_t)adaptive_interval_sec * 1000) {
+    cmd_adaptive();
   }
 }
 

@@ -30,7 +30,7 @@ compile-master:
 	$(ARDUINO_CLI) compile --fqbn $(MASTER_FQBN) $(MASTER_DIR)
 
 compile-slave:
-	$(ARDUINO_CLI) compile --fqbn $(SLAVE_FQBN) $(SLAVE_DIR)
+	$(ARDUINO_CLI) compile --fqbn $(SLAVE_FQBN) $(SLAVE_DIR) --output-dir $(SLAVE_DIR)/build
 
 # --- Upload ---
 
@@ -42,7 +42,7 @@ endif
 
 # Upload slave via USBasp ISP programmer
 upload-slave: compile-slave
-	avrdude -c usbasp -p t88 -B 125kHz -U flash:w:$(SLAVE_DIR)/build/ATTinyCore.avr.attinyx8micr/$(SLAVE_DIR).ino.hex:i
+	avrdude -c usbasp -p t88 -B 125kHz -U flash:w:$(SLAVE_DIR)/build/$(SLAVE_DIR).ino.hex:i
 
 # --- Monitor ---
 

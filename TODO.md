@@ -1,31 +1,43 @@
-# WiFi Jammer - Feature TODO
+# Arduino Wi-Fi Jammer - Feature TODO
 
 ## High Value / Low Effort
 
-- [ ] **Adaptive Jamming** — Instead of fixed channel assignments, slaves dynamically target the busiest channels detected by master's scanner. Serial commands:
+- [x] **Adaptive Jamming** — Instead of fixed channel assignments, slaves dynamically target the busiest channels detected by master's scanner. Serial commands:
   ```
-  adaptive                 Start adaptive jamming (scan and target busiest channels)
+  adaptive                 One-shot: scan and target busiest channels
+  adaptive start           Periodic adaptive jamming (rescan every N seconds)
   adaptive stop            Stop adaptive jamming, return to idle
-  adaptive threshold <n>   Set activity threshold for channel targeting (default: 50)
-  adaptive interval <sec>  Set rescan interval in seconds (default: 30)
+  adaptive thresh <n>      Set activity threshold % (0=auto, pick top 12)
+  adaptive intv <n>        Set rescan interval in seconds (default: 30)
   ```
   Examples:
   ```
   > adaptive
-  Scanning channels...
-  Targeting 6 busiest channels: 1, 6, 7, 11, 12, 13
-  Adaptive jamming started (rescan in 30s)
+  Adaptive scanning...
+  Targeting 6 busiest channels
+  Channels: 1 (85%), 6 (72%), 11 (68%), 7 (12%), 13 (8%), 3 (5%)
+  Adaptive jamming started (one-shot)
 
-  > adaptive threshold 75
-  Threshold set to 75
+  > adaptive start
+  Adaptive scanning...
+  Targeting 6 busiest channels
+  ...
+  Adaptive jamming active (rescan every 30s)
+
+  > adaptive thresh 50
+  Adaptive threshold set to 50%
 
   > adaptive
-  Scanning channels...
-  Targeting 3 channels above threshold: 6, 11, 13
-  Adaptive jamming started (rescan in 30s)
+  Adaptive scanning...
+  Targeting 3 channels >= 50%
+  Channels: 1 (85%), 6 (72%), 11 (68%)
+  Adaptive jamming started (one-shot)
 
   > adaptive stop
   Adaptive jamming stopped
+
+  > adaptive thresh 0
+  Adaptive threshold set to 0% (0=auto, pick top N)
   ```
 
 - [x] **Power Levels** — Adjust NRF24L01+ TX power. Serial commands:
@@ -45,7 +57,7 @@
   Error: Invalid power level (use 1-4)
   ```
 
-- [ ] **Slave Health Monitoring** — `status` command pings each slave via I2C and reports online/offline state with response time:
+- [x] **Slave Health Monitoring** — `status` command pings each slave via I2C and reports online/offline state with response time (µs):
   ```
   > status
   Mode: Full spectrum
@@ -64,51 +76,85 @@
 
 ## Medium Value / Medium Effort
 
-- [ ] **Sweep Mode** — Instead of parking on one channel, slaves continuously sweep across a range for broader coverage. Controlled via ON-OFF-ON toggle switch:
+- [x] **Sweep Mode** — Master cycles all 12 slaves through Wi-Fi channels 1-13 for intermittent coverage of the full 2.4GHz band. Controlled via ON-OFF-ON toggle switch:
   - Position 1 (D2 LOW): Full spectrum jamming (fixed channels)
   - Position 2 (center): Off (software control via serial)
   - Position 3 (D3 LOW): Sweep mode
-
-- [ ] **Burst Patterns** — Different jamming patterns via serial commands:
+  Serial commands:
   ```
-  pattern continuous           Default, non-stop transmission
-  pattern pulsed <ms>          Alternating on/off (e.g., 50ms on, 50ms off)
-  pattern random               Random channel hopping within assigned range
-  pattern burst <on> <off>     Burst mode (e.g., 100ms burst, 20ms gap)
+  sweep              Show current sweep status
+  sweep start        Start sweep mode
+  sweep stop         Stop sweep mode  
+  sweep <ms>         Set dwell time per channel (10-5000ms)
+  ```
+  Examples:
+  ```
+  > sweep start
+  Sweep mode started
+
+  > sweep 500
+  Sweep dwell set to 500ms
+
+  > sweep
+  Sweep: active, ch3, dwell 200ms
+
+  > sweep stop
+  Sweep stopped
+  ```
+
+- [x] **Burst Patterns** — Different jamming patterns via serial commands. I2C protocol extended from 5 to 6 bytes (byte 6 = pattern_type). Master handles pulsed/burst START/STOP timing; slave handles random frequency hopping:
+  ```
   pattern                      Show current pattern
+  pattern continuous           Continuous (default)
+  pattern pulsed <ms>          Alternating on/off (e.g., 50ms on, 50ms off)
+  pattern random               Random freq hop within assigned range
+  pattern burst <on_ms> <off_ms>  Custom on/off intervals
   ```
   Examples:
   ```
   > pattern continuous
-  Pattern set to continuous
+  Pattern: continuous
 
   > pattern pulsed 50
-  Pattern set to pulsed (50ms on, 50ms off)
+  Pattern: pulsed 50ms
+
+  > pattern random
+  Pattern: random
+
+  > pattern burst 100 20
+  Pattern: burst 100/20ms
 
   > pattern
-  Pattern: pulsed (50ms on, 50ms off)
+  Pattern: pulsed 50ms
   ```
 
-- [ ] **Activity Threshold** — `scan` command auto-identifies channels above a threshold and suggests optimal slave assignments. Serial commands:
+- [x] **Activity Threshold** — `scan` command with no args scans all 13 Wi-Fi channels for 2 seconds and reports those above a threshold percentage. Includes bar graph visualization:
   ```
-  scan threshold <n>   Set activity threshold (default: 50)
-  scan                 Scan and show channels above threshold
+  scan                 Scan all channels, show those above threshold
+  scan threshold N     Set activity threshold % (default: 50)
+  scan threshold       Show current threshold setting
+  scan 6               Live scan channel 6 for 10s (legacy)
+  scan 6 30            Live scan channel 6 for 30s (legacy)
   ```
   Examples:
   ```
   > scan threshold 60
-  Threshold set to 60
+  Scan threshold set to 60%
 
   > scan
-  Scanning...
-  Channels above threshold (60): 1, 6, 11
+  Scanning all channels...
+  Channels above threshold:
+   1  2412 MHz #######.. 68%
+   6  2437 MHz #####... 54%
+  11  2462 MHz ######## 75%
+  Threshold: 60% (scan threshold <n> to change)
   ```
 
 - [x] **LED Status Indicators** — Onboard LED on D13 (SCK) naturally flickers during SPI/NRF activity, providing visual indication of jamming state
 
 ## Nice to Have / Higher Effort
 
-- [ ] **Profile Presets** — Save/load different channel configurations. Serial commands:
+- [x] **Profile Presets** — Save/load different channel configurations (EEPROM-backed). Serial commands:
   ```
   profile save <name>    Save current channel config
   profile load <name>    Load a saved profile
@@ -118,13 +164,14 @@
   Examples:
   ```
   > profile save home
-  Profile 'home' saved (channels: 1, 6, 11)
+  Profile 'home' saved
 
   > profile list
-  Profiles: home, office, full
+  Saved profiles:
+   home  (ch6)
 
   > profile load office
-  Loaded 'office' (channels: 6, 11, 13)
+  Profile 'office' loaded
 
   > profile delete office
   Profile 'office' deleted

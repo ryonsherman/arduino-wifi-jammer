@@ -1,4 +1,4 @@
-# Wi-Fi Jammer Swarm
+# Arduino Wi-Fi Jammer
 
 A 13-node distributed Wi-Fi jamming system with an Arduino Nano master and 12 MH-Tiny (ATtiny88) slave boards using NRF24L01+ transceivers. The master controls slaves via I2C to spread jamming signals across Wi-Fi channels 1-13.
 
@@ -8,6 +8,7 @@ This system creates a coordinated jamming swarm that can:
 - Cover a single Wi-Fi channel with all 12 slaves (maximum power density)
 - Spread across all 13 channels (60MHz span) for full spectrum coverage
 - Use custom distribution patterns for targeted jamming
+- **Adaptively target the busiest channels** detected by the master's RF scanner
 - Maintain configuration between start/stop cycles
 - Report status and frequency distribution via USB Serial
 - **Hardware switch for instant full-spectrum jamming** (no PC required)
@@ -89,11 +90,12 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
 ## System Architecture
 
 ### Communication Protocol
-- **Master to Slaves**: I2C 4-byte packets
-  - Byte 0: Mode (0=Full Spectrum, 1=Single Channel, 3=Custom)
+- **Master to Slaves**: I2C 5-byte packets
+  - Byte 0: Mode (1=Single Channel, 2=Full Spectrum, 3=Custom)
   - Byte 1: Channel (1-13 or 0 for full spectrum)
   - Byte 2: Command (CMD_START=1, CMD_STOP=0)
   - Byte 3: Packed local_idx (high nibble) | group_size (low nibble) for fan-out
+  - Byte 4: Power level (0=MIN, 1=LOW, 2=HIGH, 3=MAX)
 
 ### Frequency Strategy
 - **Single Channel Mode (Fan-Out)**: 12 slaves spread across 22MHz channel width at 2MHz spacing
@@ -209,17 +211,21 @@ LEGEND
 - `channel <n>` - Set single channel (1-13) or full spectrum (0)
 - `start` - Begin transmitting with current configuration
 - `stop` - Halt transmission (keep configuration)
-- `status` - Show slave distribution and frequency map
-- `snap` - RF snapshot of all channels (5s default)
-- `snap <seconds>` - RF snapshot with custom collection time (1-60s)
-- `scan <channel>` - Live scan of a single channel (10s default)
-- `scan <channel> <seconds>` - Live scan with custom duration (1-60s)
+- `status` - Show slave distribution, health, and frequency map
+- `snapshot [N]` - RF snapshot of all channels (5s default, 1-60s)
+- `scan <ch> [N]` - Live scan a single channel (10s default, 1-60s)
+- `power [1-4]` - Set TX power (1=MIN, 2=LOW, 3=HIGH, 4=MAX)
+- `adaptive` - One-shot: scan & target busiest channels
+- `adaptive start` - Periodic adaptive jamming with auto-rescan
+- `adaptive stop` - Stop adaptive jamming
+- `adaptive thresh <n>` - Set activity threshold % (0=auto, pick top 12)
+- `adaptive intv <n>` - Set rescan interval in seconds (default 30)
 
 **RF Scanning:**
 The master's NRF24L01+ module doubles as a spectrum analyzer:
-- `snap` collects signal data across all 13 Wi-Fi channels and displays percentages
+- `snapshot` collects signal data across all 13 Wi-Fi channels and displays percentages
 - `scan 6` shows real-time activity on channel 6 with a visual bar graph
-- Useful for finding active channels before jamming
+- Adaptive jamming uses the scanner: stops slaves, scans clean, assigns busiest channels, then restarts
 
 **Distribution Syntax:**
 - Format: `n@channel1,n@channel2,...`
@@ -274,14 +280,17 @@ Distributed transmitter nodes controlled by master.
    - Single channel: `channel 6`
    - Full spectrum: `channel 0`
    - Custom: `set 4@1,2@6,2@11`
+   - Adaptive: `adaptive` (one-shot) or `adaptive start` (periodic)
 2. Check configuration: `status`
 3. Verify slave responses
+4. Optionally set TX power: `power 4`
 
 ### Execution Phase
-1. Start jamming: `start`
-2. Monitor status: `status` (real-time)
-3. Adjust as needed: `set`, `channel`
+1. Start jamming: `start` (or adaptive handles this automatically)
+2. Monitor status: `status` (shows per-slave health with response times)
+3. Adjust as needed: `adaptive` rescans and reassigns slaves to busiest channels
 4. Stop when done: `stop`
+5. Hardware switch: ON for instant full-spectrum, OFF to stop
 
 ### Persistence
 - Configuration persists across `stop`/`start` cycles
@@ -424,7 +433,10 @@ if (target > 2527) target = 2527;
 
 ### Completed Features
 - ~~Button Input~~: **Hardware switch** on D2 for instant jamming control
-- **RF Spectrum Scanning**: `snap` and `scan` commands for visualizing 2.4GHz activity
+- **RF Spectrum Scanning**: `snapshot` and `scan` commands for visualizing 2.4GHz activity
+- **Power Levels**: Adjustable TX power via `power <1-4>` command
+- **Slave Health Monitoring**: Per-slave online/offline status with response times in `status`
+- **Adaptive Jamming**: Auto-detect and target busiest channels using the master's RF scanner
 
 ### Performance Optimizations
 - Reduce loop delay from 100ms to 10ms for faster command response
