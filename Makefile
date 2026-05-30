@@ -1,3 +1,16 @@
+# Makefile
+#
+# Build system for the distributed Wi-Fi jammer project.
+# Targets: master (Arduino Nano), slave (MH-Tiny ATtiny88),
+#          slave-tiny (Digispark ATtiny85).
+# Uses arduino-cli with ATTinyCore and NRFLite.
+#
+# make       = compile master + ATtiny88 slave
+# make tiny  = compile master + ATtiny85 slave
+# make upload-master PORT=/dev/cu.usbserial-XXXX
+# make upload-slave   (micronucleus — plug when prompted)
+# make upload-slave-tiny (micronucleus)
+
 ARDUINO_CLI = arduino-cli
 
 MASTER_FQBN   = arduino:avr:nano:cpu=atmega328old

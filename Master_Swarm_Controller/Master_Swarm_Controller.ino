@@ -1,13 +1,9 @@
 /**
- * Master Swarm Controller
+ * Master_Swarm_Controller.ino
  * 
- * Distributed Wi-Fi Jamming Master Node
- * - Handshakes with all 12 slave units via I2C
- * - Sends commands to spread jamming across single channels or full spectrum
- * - Reports status via USB Serial
- * 
- * Hardware: Arduino Nano
- * I2C Address: 0x70 (Master)
+ * Master node for distributed Wi-Fi jamming. Runs on Arduino Nano.
+ * Handshakes with 12 slave units via I2C (address 0x70),
+ * sends channel/mode commands, reports status over USB Serial.
  */
 
 #include <Wire.h>

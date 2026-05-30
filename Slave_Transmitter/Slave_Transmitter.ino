@@ -1,3 +1,13 @@
+/**
+ * Slave_Transmitter.ino
+ * 
+ * Slave NRF24L01+ transmitter for distributed Wi-Fi jamming.
+ * Receives channel/mode/start-stop commands via I2C and jams
+ * using NRFLite with NO_ACK packets on the specified frequency.
+ * Targets: MH-Tiny ATtiny88 (ATTinyCore attinyx8micr) or
+ *          Digispark ATtiny85 (ATTinyCore attinyx5micr).
+ */
+
 #include <NRFLite.h>
 #include <Wire.h>
 
