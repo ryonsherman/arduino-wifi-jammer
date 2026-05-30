@@ -7,9 +7,13 @@ SLAVE_TINY_FQBN  = ATTinyCore:avr:attinyx5micr
 MASTER_DIR    = Master_Swarm_Controller
 SLAVE_DIR     = Slave_Transmitter
 
-.PHONY: all compile-master compile-slave compile-slave-tiny upload-master upload-slave upload-slave-tiny clean
+.PHONY: all tiny compile-master compile-slave compile-slave-tiny upload-master upload-slave upload-slave-tiny clean
 
+# make        = master + slave (ATtiny88)
+# make tiny   = master + slave-tiny (ATtiny85)
 all: compile-master compile-slave
+
+tiny: compile-master compile-slave-tiny
 
 # --- Compile ---
 
