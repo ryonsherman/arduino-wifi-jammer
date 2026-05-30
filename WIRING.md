@@ -182,7 +182,6 @@ All nodes must share common ground
 | NRF24L01+ RX mode    | 14.5mA      | 12mA            |
 | **Total per Slave**  | ~62mA       | ~32mA           |
 | **Total System**     | ~806mA      | ~416mA          |
-| (13 nodes combined)  |             |                 |
 
     Recommendation: 1A+ power supply for all 13 nodes
 
@@ -192,14 +191,23 @@ All nodes must share common ground
 Pre-Flight Wiring Check:
 
 [ ] All nodes share common GND
+
 [ ] NRF24L01+ VCC: 3.3V (direct to module) or 5V (if breakout has regulator)
+
 [ ] SDA connected on all nodes (Nano A4, MH-Tiny Pin 23)
+
 [ ] SCL connected on all nodes (Nano A5, MH-Tiny Pin 24)
+
 [ ] CE pin (9) connected on all nodes
+
 [ ] CSN pin (10) connected on all nodes
+
 [ ] SPI pins (11, 12, 13) connected on all nodes
+
 [ ] Antenna attached to all NRF24L01+ modules
+
 [ ] Master connected to USB serial
+
 [ ] Power source capable of 1A+
 
 
