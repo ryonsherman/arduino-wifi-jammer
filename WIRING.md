@@ -194,7 +194,7 @@ For battery-powered operation, use a 9V battery → buck converter → 5V rail �
                                                         |
                                                        === GND
 
-                     5V RAIL
+                               5V RAIL
     +------------------+------------------+------------------+
     |                  |                  |                  |
  +--+--------+    +----+-------+    +-----+-------+    +----+------+
@@ -205,7 +205,7 @@ For battery-powered operation, use a 9V battery → buck converter → 5V rail �
  +-----------+    +------------+    +-------------+    +-----------+
     |                  |                  |                  |
     +------------------+------------------+------------------+
-                           GND RAIL (common ground)
+                     GND RAIL (common ground)
 
 
     Notes:
