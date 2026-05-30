@@ -186,11 +186,11 @@ Place a 10uF + 0.1uF capacitor pair as close as possible to each NRF24L01+ modul
 For battery-powered operation, use a 9V battery → buck converter → 5V rail → 100uF bulk cap.
 
 ```
-     +-----+         +-------------------+         +-----------+
-     | 9V  |         |   Buck Converter  |         |  100uF    |
-     | Bat |---------|  (step-down)      |---------| Electrolyt|----- 5V rail
-     |     | 9V in   |  5V out, 3A max  |  5V out |  (+ to 5V)| 
-     +-----+         +-------------------+         +-----------+     
+    +-----+         +-------------------+         +-----------+
+    | 9V  |         |   Buck Converter  |         |  100uF    |
+    | Bat |---------|  (step-down)      |---------| Electrolyt|----- 5V rail
+    |     | 9V in   |  5V out, 3A max   |  5V out |  (+ to 5V)| 
+    +-----+         +-------------------+         +-----------+     
                                                         |
                                                        === GND
 
