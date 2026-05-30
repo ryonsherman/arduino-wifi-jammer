@@ -105,8 +105,11 @@ Usage: `channel <n>`
 
 Examples:
   `channel 6`        -> All slaves on channel 6 (2420 MHz)
+
   `channel 1`        -> All slaves on channel 1 (2412 MHz)
+
   `channel 13`       -> All slaves on channel 13 (2472 MHz)
+  
   `channel 0`        -> Full spectrum (slaves spread across 60MHz span)
 
 Frequency Mapping:
@@ -161,30 +164,35 @@ Usage: `status`
 
 Output Sections:
 
+```
 === Slave Status ===
-- Active: X/12 (active slaves count)
-- Channel X: Y (count per channel in custom mode)
-- Channel: N (single channel mode)
-- Channel: All (full spectrum mode)
+  Active: X/12 (active slaves count)
+  Channel X: Y (count per channel in custom mode)
+  Channel: N (single channel mode)
+  Channel: All (full spectrum mode)
 
 === Channel Distribution ===
-- Mode: Single Channel / Full Spectrum / Custom Distribution
-- Slave N [ACTIVE] Channel: X (freq MHz)
-  or
-- Slave N [IDLE] (inactive slave)
-  or
-- Slave N -> Channel X (freq MHz)
+  Mode: Single Channel / Full Spectrum / Custom Distribution
+  Slave N [ACTIVE] Channel: X (freq MHz)
+    or
+  Slave N [IDLE] (inactive slave)
+    or
+  Slave N -> Channel X (freq MHz)
+```
 
 Example Output:
-  === Slave Status ===
-  Active: 12/12
-  Channel: All
 
-  === Channel Distribution ===
-  Mode: Full Spectrum
-  Slave 1 -> Freq 2415 (2415 MHz)
-  Slave 2 -> Freq 2420 (2420 MHz)
-  ...
+```
+=== Slave Status ===
+Active: 12/12
+Channel: All
+
+=== Channel Distribution ===
+Mode: Full Spectrum
+Slave 1 -> Freq 2415 (2415 MHz)
+Slave 2 -> Freq 2420 (2420 MHz)
+...
+```
 
 
 ## MODES OVERVIEW
