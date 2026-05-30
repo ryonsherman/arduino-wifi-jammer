@@ -3,10 +3,10 @@
 ## System Overview
 
 ```
-                    MASTER NODE
-          (Arduino Nano + NRF24L01+)
-          I2C Address: 0x70
-          NRF24 Mode: RX
+                          MASTER NODE
+                   (Arduino Nano + NRF24L01+)
+                       I2C Address: 0x70
+                        NRF24 Mode: RX
 
           USB ---> Serial Monitor (115200 baud)
 
