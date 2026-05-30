@@ -318,9 +318,34 @@ void poll_slave_status() {
   Serial.print(F("[STATUS] "));
   Serial.print(active);
   Serial.print(F("/12 jamming"));
-  if (current_mode == MODE_SINGLE_CHANNEL) {
+  if (current_mode == MODE_FULL_SPECTRUM) {
+    Serial.print(F(" full spectrum"));
+  } else if (current_mode == MODE_SINGLE_CHANNEL) {
     Serial.print(F(" on ch "));
     Serial.print(selected_channel);
+  } else if (current_mode == MODE_CUSTOM) {
+    Serial.print(F(" on channels "));
+    bool first = true;
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      if (custom_config[i].active) {
+        bool dup = false;
+        for (uint8_t j = 0; j < i; j++) {
+          if (custom_config[j].active && custom_config[j].channel == custom_config[i].channel) {
+            dup = true;
+            break;
+          }
+        }
+        if (!dup) {
+          if (!first) Serial.print(',');
+          first = false;
+          if (custom_config[i].channel == 0) {
+            Serial.print(F("full"));
+          } else {
+            Serial.print(custom_config[i].channel);
+          }
+        }
+      }
+    }
   }
   Serial.println();
 }
