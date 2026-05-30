@@ -157,23 +157,24 @@ Place a 10uF + 0.1uF capacitor pair as close as possible to each NRF24L01+ modul
          NRF24L01+ MODULE
     +-----------------------+
     |                       |
-    |  VCC o----+-----------+--- 3.3V rail
-    |           |
-    |          +-+
-    |          | | 10uF (electrolytic / tantalum)
-    |          | |  (+ side to VCC)
-    |          +-+
-    |           |
-    |          +-+
-    |          | | 0.1uF (ceramic)
-    |          | |
-    |          +-+
-    |           |
-    |  GND o----+-----------+--- GND rail
+    |  VCC o--+------+------+--- 3.3V rail
+    |          |      |
+    |         +-+    +-+
+    |         | |    | | 10uF (electrolytic / tantalum)
+    |         | |    | |  (+ side to VCC)
+    |         +-+    +-+
+    |          |      |
+    |         +-+    +-+
+    |         | |    | | 0.1uF (ceramic)
+    |         | |    | |
+    |         +-+    +-+
+    |          |      |
+    |  GND o--+------+------+--- GND rail
     |                       |
     +-----------------------+
 
     Notes:
+    - Both caps connect directly between VCC and GND (parallel)
     - 10uF = bulk decoupling (handles sudden current draws during TX)
     - 0.1uF = high-frequency noise suppression
     - Place capacitors as close to module pins as possible
