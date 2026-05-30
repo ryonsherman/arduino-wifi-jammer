@@ -114,7 +114,8 @@ Examples:
 
 Frequency Mapping:
 - Single Channel Mode uses **fan-out**: slaves spread across 22MHz channel width
-  - Formula: `center_freq + (slave_id * 2) - 11`
+  - Formula: `center_freq + (local_idx * 2) - (group_size - 1)`
+  - With 12 slaves (group_size=12), offsets range from -11 to +11 MHz
   - Example: Channel 6 (center 2437 MHz) → Slaves cover 2426-2448 MHz
 - Channel 1 center:  2412 MHz → fan-out 2401-2423 MHz
 - Channel 6 center:  2437 MHz → fan-out 2426-2448 MHz
@@ -208,9 +209,10 @@ Best for: Complete coverage of a single Wi-Fi channel
 Usage: `channel <1-13>`
 Example: `channel 6` -> Slaves spread 2426-2448 MHz (covering channel 6's full width)
 
-Fan-out formula: `center_freq + (slave_id * 2) - 11`
-- slave_id 0: center - 11 MHz
-- slave_id 11: center + 11 MHz
+Fan-out formula: `center_freq + (local_idx * 2) - (group_size - 1)`
+- With 12 slaves (group_size=12): offsets -11 to +11 MHz from center
+- local_idx 0: center - 11 MHz
+- local_idx 11: center + 11 MHz
 
 ### FULL SPECTRUM MODE
 
@@ -233,7 +235,17 @@ Best for: Targeted jamming of specific channels
 Usage: `set <distribution>`
 Example: `set 4@1,2@6,2@11,4@6`
   -> 4 slaves on ch1, 2 on ch6, 2 on ch11, 4 on ch6
-  -> Each channel uses fan-out for full width coverage
+  -> Each channel group uses independent fan-out for full width coverage
+
+**Local Index Fan-Out**: Each channel group is independently centered using
+the formula: `center_freq + (local_idx * 2) - (group_size - 1)`
+
+Example: `set 4@1,4@6,4@11`
+  -> Each group has 4 slaves (group_size=4)
+  -> Offsets within each group: -3, -1, +1, +3 MHz from channel center
+  -> Channel 1 group: 2409, 2411, 2413, 2415 MHz
+  -> Channel 6 group: 2434, 2436, 2438, 2440 MHz
+  -> Channel 11 group: 2459, 2461, 2463, 2465 MHz
 
 
 ## USAGE EXAMPLES
@@ -286,7 +298,8 @@ Channel | Center (MHz) | Fan-Out Range (MHz) | Notes
 11      | 2462         | 2451-2473           | Non-overlapping with 1,6
 13      | 2472         | 2461-2483           | EU only (US limit 11)
 
-Fan-out formula: `center + (slave_id * 2) - 11` where slave_id is 0-11
+Fan-out formula: `center + (local_idx * 2) - (group_size - 1)` where local_idx is 0 to group_size-1
+- Single channel mode: group_size=12, so offsets are -11 to +11 MHz
 
 ### Full Spectrum Mode Frequencies
 Slave   | Frequency (MHz) | Channel Approx
@@ -413,6 +426,6 @@ status          | status                     | Show distribution
 
 ---
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Last Updated**: May 2026  
 **Author**: Ryon Sherman

@@ -89,20 +89,20 @@ Built into the kernel (CH341 driver since ~3.x). No installation needed. The dev
   - Byte 0: Mode (0=Full Spectrum, 1=Single Channel, 3=Custom)
   - Byte 1: Channel (1-13 or 0 for full spectrum)
   - Byte 2: Command (CMD_START=1, CMD_STOP=0)
-  - Byte 3: Slave ID (0-11) for fan-out frequency calculation
+  - Byte 3: Packed local_idx (high nibble) | group_size (low nibble) for fan-out
 
 ### Frequency Strategy
 - **Single Channel Mode (Fan-Out)**: 12 slaves spread across 22MHz channel width at 2MHz spacing
-  - Formula: `center_freq + (slave_id * 2) - 11` where slave_id is 0-11
-  - Example: Channel 6 (center 2437 MHz) → Slaves cover 2426-2448 MHz
-  - This blankets the entire channel width instead of all slaves hitting the same center frequency
+  - Formula: `center_freq + (local_idx * 2) - (group_size - 1)` where local_idx is 0 to group_size-1
+  - Example: Channel 6 (center 2437 MHz) with 12 slaves → Slaves cover 2426-2448 MHz
+  - This centers the fan-out around the channel peak frequency
   - Channel centers: Ch 1 = 2412 MHz, Ch 6 = 2437 MHz, Ch 11 = 2462 MHz, Ch 13 = 2472 MHz
 
 - **Full Spectrum Mode**: 12 slaves spread across 60MHz at 5MHz spacing
   - Coverage: 2415, 2420, 2425...2470 MHz
   - Mid-channel positioning for maximum coverage
 
-- **Custom Mode**: Flexible per-slave channel assignment (uses fan-out within each channel)
+- **Custom Mode**: Flexible per-slave channel assignment (uses balanced fan-out centered around each channel)
 
 ### Jamming Modes Visualized
 
@@ -140,35 +140,40 @@ MODE 1: SINGLE CHANNEL (Fan-Out) — Example: channel 6
 MODE 2: FULL SPECTRUM — channel 0
 ═══════════════════════════════════════════════════════════════════════════════
 
-    2415                              2470 MHz
-      │◄──────── 60 MHz span ────────►│
-      │                                │
-    ──┼────────────────────────────────┼──────────────────────
+    2415                                                               2470 MHz
+      │◄───────────────────────── 60 MHz span ─────────────────────────►│
+      │                                                                 │
+    ──┼─────────────────────────────────────────────────────────────────┼──
       ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼
       0     1     2     3     4     5     6     7     8     9     A     B
       │     │     │     │     │     │     │     │     │     │     │     │
     ──┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴──
     2415  2420  2425  2430  2435  2440  2445  2450  2455  2460  2465  2470
-                           5 MHz spacing
+                                5 MHz spacing
 
-    Covers Ch1 ──────────────────────────────────────────────► Ch13
+    Covers Ch1 ────────────────────────────────────────────────────────► Ch13
 
 
 ═══════════════════════════════════════════════════════════════════════════════
 MODE 3: CUSTOM DISTRIBUTION — Example: set 4@1,4@6,4@11
 ═══════════════════════════════════════════════════════════════════════════════
 
-    Ch1 (fan-out)           Ch6 (fan-out)           Ch11 (fan-out)
-    2401-2423               2426-2448               2451-2473
-        │                       │                       │
-    ────┼───────────────────────┼───────────────────────┼────────────────
-        │ ▼ ▼ ▼ ▼               │ ▼ ▼ ▼ ▼               │ ▼ ▼ ▼ ▼
-        │ 0 1 2 3               │ 4 5 6 7               │ 8 9 A B
-        │ │ │ │ │               │ │ │ │ │               │ │ │ │ │
-    ────┴─┴─┴─┴─┴───────────────┴─┴─┴─┴─┴───────────────┴─┴─┴─┴─┴────────
-       2401   2407             2426   2432             2451   2457
+    Ch1 (balanced fan-out)    Ch6 (balanced fan-out)    Ch11 (balanced fan-out)
+           2412                      2437                      2462
+            │                         │                         │
+    ────────┼─────────────────────────┼─────────────────────────┼──────────────
+          ▼ ▼ ▼ ▼                   ▼ ▼ ▼ ▼                   ▼ ▼ ▼ ▼
+          0 1 2 3                   4 5 6 7                   8 9 A B
+          │ │ │ │                   │ │ │ │                   │ │ │ │
+    ──────┴─┴─┴─┴───────────────────┴─┴─┴─┴───────────────────┴─┴─┴─┴──────────
+        2409 2413               2434 2438               2459 2463
+           2411 2415               2436 2440               2461 2465
 
-    4 slaves per channel, each with 2 MHz fan-out spacing within channel
+    4 slaves per channel, centered around peak:
+      local_idx 0 → center + (0*2) - 3 = center - 3  (e.g., 2409 for Ch1)
+      local_idx 1 → center + (1*2) - 3 = center - 1  (e.g., 2411 for Ch1)
+      local_idx 2 → center + (2*2) - 3 = center + 1  (e.g., 2413 for Ch1)
+      local_idx 3 → center + (3*2) - 3 = center + 3  (e.g., 2415 for Ch1)
 
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -336,16 +341,21 @@ Slave 12 -> Freq 2470 (2470 MHz)
 ## Frequency Calculations
 
 ### Single Channel Mode (Fan-Out)
-Slaves spread across the 22MHz channel width at 2MHz intervals:
+Slaves spread across the 22MHz channel width at 2MHz intervals, centered around the channel peak:
 ```cpp
 // center_freq = 2400 + 12 + (ch - 1) * 5
-// fan-out = center_freq + (slave_id * 2) - 11
-// Example: Channel 6 (center 2437 MHz)
-//   slave_id 0  -> 2437 + (0 * 2) - 11 = 2426 MHz
-//   slave_id 5  -> 2437 + (5 * 2) - 11 = 2436 MHz
-//   slave_id 11 -> 2437 + (11 * 2) - 11 = 2448 MHz
+// fan-out = center_freq + (local_idx * 2) - (group_size - 1)
+// Example: Channel 6 (center 2437 MHz) with 12 slaves (group_size=12)
+//   local_idx 0  -> 2437 + (0 * 2) - 11 = 2426 MHz
+//   local_idx 5  -> 2437 + (5 * 2) - 11 = 2436 MHz
+//   local_idx 11 -> 2437 + (11 * 2) - 11 = 2448 MHz
+// Example: Custom mode with 4 slaves on Ch1 (group_size=4)
+//   local_idx 0  -> 2412 + (0 * 2) - 3 = 2409 MHz
+//   local_idx 1  -> 2412 + (1 * 2) - 3 = 2411 MHz
+//   local_idx 2  -> 2412 + (2 * 2) - 3 = 2413 MHz
+//   local_idx 3  -> 2412 + (3 * 2) - 3 = 2415 MHz
 uint16_t center = 2412 + (channel - 1) * 5;
-uint16_t freq = center + (slave_id * 2) - 11;
+uint16_t freq = center + (local_idx * 2) - (group_size - 1);
 ```
 
 ### Full Spectrum Mode

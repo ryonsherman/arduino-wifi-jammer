@@ -13,6 +13,12 @@
 // --- Configuration ---
 #define MASTER_ADDR 0x70
 #define TOTAL_SLAVES 12
+
+// Compile-time guard: local_idx and group_size are packed into 4-bit nibbles (max 15)
+// See send_cmd() byte 4 packing and Slave_Transmitter.ino FANOUT_* macros
+#if TOTAL_SLAVES > 15
+#error "TOTAL_SLAVES exceeds 15 - nibble packing in send_cmd() byte 4 will overflow"
+#endif
 #define SLAVE_ADDR_START 0x01
 
 // --- Modes ---
@@ -45,32 +51,58 @@ static uint8_t slave_cfg[TOTAL_SLAVES];  // Was 48 bytes (struct), now 12 bytes
 
 /**
  * Send I2C command to a specific slave
+ * Byte 4 packs local_idx (high nibble) + group_size (low nibble) for fan-out
  */
-static void send_cmd(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cmd) {
+static void send_cmd(uint8_t slave_id, uint8_t mode, uint8_t channel, uint8_t cmd, uint8_t local_idx, uint8_t group_size) {
   Wire.beginTransmission(SLAVE_ADDR_START + slave_id);
   Wire.write(mode);
   Wire.write(channel);
   Wire.write(cmd);
-  Wire.write(slave_id);
+  Wire.write(((local_idx & 0x0F) << 4) | (group_size & 0x0F));
   Wire.endTransmission();
 }
 
 /**
- * Send I2C command to all slaves
+ * Send I2C command to all slaves (single channel or full spectrum mode)
  */
 static void send_cmd_all(uint8_t mode, uint8_t channel, uint8_t cmd) {
   for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
-    send_cmd(i, mode, channel, cmd);
+    send_cmd(i, mode, channel, cmd, i, TOTAL_SLAVES);
   }
 }
 
 /**
  * Send custom commands to each slave based on their config
+ * Uses local indexing within each channel group for balanced fan-out
+ * 
+ * One-pass algorithm: iterate by channel, then by slave.
+ * For each channel, first count active slaves (group_size), then send
+ * commands to each with incrementing local_idx. Only 2 bytes stack usage.
+ * 
+ * NOTE: This channel-grouping logic must stay in sync with print_freq_map().
+ * Both functions compute (group_size, local_idx) per channel but use different
+ * algorithms optimized for their use case:
+ * - send_custom_cmds(): one-pass, sends immediately (no array storage)
+ * - print_freq_map(): two-pass with arrays (channels must print in slave order)
+ * If you modify the grouping logic here, update print_freq_map() to match.
  */
 static void send_custom_cmds(uint8_t cmd) {
-  for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
-    if (CFG_GET_ACTIVE(i)) {
-      send_cmd(i, MODE_CUSTOM, CFG_GET_CHANNEL(i), cmd);
+  for (uint8_t ch = 1; ch <= 13; ch++) {
+    // Count slaves on this channel
+    uint8_t group_size = 0;
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      if (CFG_GET_ACTIVE(i) && CFG_GET_CHANNEL(i) == ch) {
+        group_size++;
+      }
+    }
+    if (group_size == 0) continue;
+    
+    // Send commands with local index
+    uint8_t local_idx = 0;
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      if (CFG_GET_ACTIVE(i) && CFG_GET_CHANNEL(i) == ch) {
+        send_cmd(i, MODE_CUSTOM, ch, cmd, local_idx++, group_size);
+      }
     }
   }
 }
@@ -100,18 +132,37 @@ static uint8_t scan_slaves() {
 
 /**
  * Calculate frequency offset for display
+ * Uses local fan-out formula: center + (local_idx * 2) - (group_size - 1)
  */
-static uint8_t calc_freq(uint8_t slave_id, uint8_t mode, uint8_t channel) {
+static uint8_t calc_freq(uint8_t local_idx, uint8_t group_size, uint8_t mode, uint8_t channel) {
   if (mode == MODE_SINGLE_CHANNEL || mode == MODE_CUSTOM) {
-    // center + fan-out: ch*5 + sid*2 - 4
-    return (channel << 2) + channel + (slave_id << 1) - 4;
+    // center = 12 + (ch-1)*5 = 7 + ch*5
+    // offset = (local_idx * 2) - (group_size - 1)
+    // freq = center + offset = 7 + ch*5 + local_idx*2 - group_size + 1 = 8 + ch*5 + local_idx*2 - group_size
+    int8_t offset = (local_idx << 1) - (group_size - 1);
+    uint8_t center = 7 + (channel << 2) + channel;  // 7 + ch*5
+    return center + offset;
   }
-  // Full spectrum: 15 + sid*5
-  return 15 + (slave_id << 2) + slave_id;
+  // Full spectrum: 15 + local_idx*5
+  return 15 + (local_idx << 2) + local_idx;
 }
 
 /**
  * Print frequency distribution for all slaves
+ * 
+ * Two-pass algorithm for Custom mode (14 bytes stack):
+ * - Pass 1: count slaves per channel (populates group_size[])
+ * - Pass 2: print with incrementing local_idx per channel
+ * 
+ * Trade-off: 14 bytes stack vs O(n²) recomputation per slave.
+ * On Nano with 2KB RAM, this is acceptable for display-only code.
+ * 
+ * NOTE: This channel-grouping logic must stay in sync with send_custom_cmds().
+ * Both functions compute (group_size, local_idx) per channel but use different
+ * algorithms optimized for their use case:
+ * - print_freq_map(): two-pass with arrays (channels must print in slave order)
+ * - send_custom_cmds(): one-pass, sends immediately (no array storage)
+ * If you modify the grouping logic here, update send_custom_cmds() to match.
  */
 static void print_freq_map() {
   Serial.println(F("\n=== Frequency Map ==="));
@@ -125,23 +176,46 @@ static void print_freq_map() {
     Serial.println(F("Mode: Custom"));
   }
   
-  for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
-    uint8_t freq;
-    Serial.print(F("S"));
-    Serial.print(i);
-    Serial.print(F(": "));
+  if (current_mode == MODE_CUSTOM) {
+    // Two-pass for custom mode: count then print
+    uint8_t group_size[14] = {0};  // 14 bytes stack (channels 1-13, index 0 unused)
     
-    if (current_mode == MODE_CUSTOM) {
+    // Pass 1: count slaves per channel
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      if (CFG_GET_ACTIVE(i)) {
+        uint8_t ch = CFG_GET_CHANNEL(i);
+        if (ch <= 13) group_size[ch]++;
+      }
+    }
+    
+    // Pass 2: print with local indices
+    uint8_t local_idx[14] = {0};  // 14 bytes stack
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      Serial.print(F("S"));
+      Serial.print(i);
+      Serial.print(F(": "));
+      
       if (!CFG_GET_ACTIVE(i)) {
         Serial.println(F("IDLE"));
         continue;
       }
-      freq = calc_freq(i, MODE_CUSTOM, CFG_GET_CHANNEL(i));
-    } else {
-      freq = calc_freq(i, current_mode, selected_channel);
+      
+      uint8_t ch = CFG_GET_CHANNEL(i);
+      uint8_t freq = calc_freq(local_idx[ch], group_size[ch], MODE_CUSTOM, ch);
+      local_idx[ch]++;
+      Serial.print(2400 + freq);
+      Serial.println(F(" MHz"));
     }
-    Serial.print(2400 + freq);
-    Serial.println(F(" MHz"));
+  } else {
+    // Single channel or full spectrum: simple iteration
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      Serial.print(F("S"));
+      Serial.print(i);
+      Serial.print(F(": "));
+      uint8_t freq = calc_freq(i, TOTAL_SLAVES, current_mode, selected_channel);
+      Serial.print(2400 + freq);
+      Serial.println(F(" MHz"));
+    }
   }
 }
 
