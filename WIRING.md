@@ -238,5 +238,7 @@ Frequency Drift:
 ---
 
 Version: 1.0
+
 Last Updated: May 2026
+
 Notes: Use shielded I2C cables for best results in noisy environments
