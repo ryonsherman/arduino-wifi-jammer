@@ -606,14 +606,22 @@ static void print_freq_map() {
 static void print_status() {
   Serial.println(F("\n=== Status ==="));
   
+  // Count active slaves (from config) and online slaves (from poll)
   uint8_t active = 0;
+  uint8_t online = 0;
   for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
     if (current_mode != MODE_CUSTOM || CFG_GET_ACTIVE(i)) active++;
   }
   
   Serial.print(F("Active: "));
   Serial.print(current_mode == MODE_CUSTOM ? active : TOTAL_SLAVES);
-  Serial.println(F("/12"));
+  Serial.print(F("/12"));
+  if (online < TOTAL_SLAVES) {
+    Serial.print(F(" ("));
+    Serial.print(online);
+    Serial.print(F(" online)"));
+  }
+  Serial.println();
   
   if (current_mode == MODE_SINGLE_CHANNEL) {
     Serial.print(F("Channel: "));
@@ -656,7 +664,6 @@ static void print_status() {
   
   // Per-slave health
   Serial.println(F("\n-- Slaves --"));
-  uint8_t online = 0;
   for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
     uint8_t ch;
     if (current_mode == MODE_FULL_SPECTRUM) {
@@ -939,37 +946,37 @@ static void stop_sweep(void) {
  */
 static void print_help() {
   Serial.println(F("\n============== Commands =============="));
-  Serial.println(F("help        - Show commands"));
-  Serial.println(F("get         - Get slave config (get all, get 0,1,2)"));
-  Serial.println(F("set         - Custom dist (set 4@1,2@6,2@11)"));
-  Serial.println(F("channel     - Set channel (1-13) or 0=spectrum"));
-  Serial.println(F("start       - Begin jamming"));
-  Serial.println(F("stop        - Stop jamming"));
-  Serial.println(F("status      - Show status & freq map"));
-  Serial.println(F("snapshot    - RF snapshot 5s (default)"));
-  Serial.println(F("snapshot 30 - RF snapshot 30s collection"));
-  Serial.println(F("scan             - Scan all ch, show above threshold"));
-  Serial.println(F("scan threshold N - Set scan threshold %"));
-  Serial.println(F("scan 6           - Live scan ch 6, 10s (default)"));
-  Serial.println(F("scan 6 30        - Live scan ch 6 for 30s"));
-  Serial.println(F("power       - Show current power"));
-  Serial.println(F("adaptive          - One-shot: scan & target busiest channels"));
-  Serial.println(F("adaptive start    - Periodic adaptive jamming"));
-  Serial.println(F("adaptive stop     - Stop adaptive jamming"));
-  Serial.println(F("adaptive thresh N - Min activity % (0=auto)"));
-  Serial.println(F("adaptive intv N   - Rescan interval (sec)"));
-  Serial.println(F("profile list      - List saved profiles"));
-  Serial.println(F("profile save <n>  - Save current config as profile"));
-  Serial.println(F("profile load <n>  - Load a saved profile"));
-  Serial.println(F("profile delete <n>- Delete a profile"));
-  Serial.println(F("sweep             - Show sweep status"));
-  Serial.println(F("sweep start       - Start sweep mode"));
-  Serial.println(F("sweep stop        - Stop sweep mode"));
-  Serial.println(F("sweep 500         - Set dwell (10-5000ms)"));
-  Serial.println(F("pattern           - Show/set jamming pattern"));
-  Serial.println(F("pattern continuous - Continuous (default)"));
-  Serial.println(F("pattern pulsed 50 - Alternating on/off"));
-  Serial.println(F("pattern random    - Random freq hop"));
+  Serial.println(F("help                 - Show commands"));
+  Serial.println(F("get                  - Get slave config (get all, get 0,1,2)"));
+  Serial.println(F("set                  - Custom dist (4@1,2@6,2@11 or 1=2,2=2,3=1)"));
+  Serial.println(F("channel              - Set channel (1-13) or 0=spectrum"));
+  Serial.println(F("start                - Begin jamming"));
+  Serial.println(F("stop                 - Stop jamming"));
+  Serial.println(F("status               - Show status & freq map"));
+  Serial.println(F("snapshot             - RF snapshot 5s (default)"));
+  Serial.println(F("snapshot 30          - RF snapshot 30s collection"));
+  Serial.println(F("scan                 - Scan all ch, show above threshold"));
+  Serial.println(F("scan threshold N     - Set scan threshold %"));
+  Serial.println(F("scan 6               - Live scan ch 6, 10s (default)"));
+  Serial.println(F("scan 6 30            - Live scan ch 6 for 30s"));
+  Serial.println(F("power                - Show current power"));
+  Serial.println(F("adaptive             - One-shot: scan & target busiest channels"));
+  Serial.println(F("adaptive start       - Periodic adaptive jamming"));
+  Serial.println(F("adaptive stop        - Stop adaptive jamming"));
+  Serial.println(F("adaptive thresh N    - Min activity % (0=auto)"));
+  Serial.println(F("adaptive intv N      - Rescan interval (sec)"));
+  Serial.println(F("profile list         - List saved profiles"));
+  Serial.println(F("profile save <n>     - Save current config as profile"));
+  Serial.println(F("profile load <n>     - Load a saved profile"));
+  Serial.println(F("profile delete <n>   - Delete a profile"));
+  Serial.println(F("sweep                - Show sweep status"));
+  Serial.println(F("sweep start          - Start sweep mode"));
+  Serial.println(F("sweep stop           - Stop sweep mode"));
+  Serial.println(F("sweep 500            - Set dwell (10-5000ms)"));
+  Serial.println(F("pattern              - Show/set jamming pattern"));
+  Serial.println(F("pattern continuous   - Continuous (default)"));
+  Serial.println(F("pattern pulsed 50    - Alternating on/off"));
+  Serial.println(F("pattern random       - Random freq hop"));
   Serial.println(F("pattern burst 100 20 - Custom on/off"));
   Serial.println(F("======================================"));
 }
@@ -1003,6 +1010,7 @@ void setup() {
   Wire.begin(MASTER_ADDR);
   
   slave_count = scan_slaves();
+  poll_slaves();  // Populate slave_online[] array for status display
   
   Serial.print(F("Found "));
   Serial.print(slave_count);
@@ -1082,13 +1090,20 @@ void executeCommand(String &cmdLine) {
     if (hw_jamming_active) { print_hw_switch_on(); return; }
     if (hw_sweep_active) { print_hw_sweep_on(); return; }
     cancel_adaptive();
-    // Parse distribution: "4@1,2@6,2@11"
+    // Parse distribution: "4@1,2@6,2@11" or "1=1,2=2"
     if (!args) return;
+    
+    // Reset all slaves to idle first
+    for (uint8_t i = 0; i < TOTAL_SLAVES; i++) {
+      CFG_SET(i, 0, false);
+    }
+    
     uint8_t idx = 0;
     char *save;
     char *token = strtok_r(args, ",", &save);
     while (idx < TOTAL_SLAVES && token) {
       char *at = strchr(token, '@');
+      char *eq = strchr(token, '=');
       if (at) {
         *at = '\0';
         uint8_t count = atoi(token);
@@ -1104,13 +1119,26 @@ void executeCommand(String &cmdLine) {
           CFG_SET(idx, ch, true);
           idx++;
         }
+      } else if (eq) {
+        *eq = '\0';
+        uint8_t slave_num = atoi(token);
+        uint8_t ch = atoi(eq + 1);
+
+        if (slave_num < 1 || slave_num > TOTAL_SLAVES) {
+          Serial.print(F("Invalid slave: "));
+          Serial.println(slave_num);
+          return;
+        }
+        if (ch < 1 || ch > 13) {
+          Serial.print(F("Invalid ch: "));
+          Serial.println(ch);
+          return;
+        }
+
+        CFG_SET(slave_num - 1, ch, true);
+        idx++;
       }
       token = strtok_r(NULL, ",", &save);
-    }
-
-    // Mark remaining as idle
-    for (uint8_t i = idx; i < TOTAL_SLAVES; i++) {
-      CFG_SET(i, 0, false);
     }
 
     current_mode = MODE_CUSTOM;

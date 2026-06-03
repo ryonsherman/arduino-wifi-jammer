@@ -292,7 +292,7 @@ PATTERN MODES — Transmission timing
 **Commands:**
 - `help` - Display command list
 - `get [ids]` - Query slave configurations (e.g., `get 0,1,2` or `get all`)
-- `set <distribution>` - Set custom distribution (e.g., `set 4@1,2@6,2@11`)
+- `set <distribution>` - Set custom distribution (`set 4@1,2@6,2@11` or `set 1=1,2=2,12=11`)
 - `channel <n>` - Set single channel (1-13) or full spectrum (0)
 - `start` - Begin transmitting with current configuration
 - `stop` - Halt transmission (keep configuration)
@@ -364,7 +364,7 @@ Distributed transmitter nodes controlled by master.
 1. Set desired mode:
    - Single channel: `channel 6`
    - Full spectrum: `channel 0`
-   - Custom: `set 4@1,2@6,2@11`
+   - Custom: `set 4@1,2@6,2@11` (count@channel) or `set 1=1,2=2` (slave=channel)
    - Adaptive: `adaptive` (one-shot) or `adaptive start` (periodic)
 2. Check configuration: `status`
 3. Verify slave responses
