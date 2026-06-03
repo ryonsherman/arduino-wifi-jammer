@@ -1,5 +1,6 @@
-.context.md
-NRF_Tester/
-Slave_Transmitter/build/
-.history
 
+.context.md
+.history
+NRF_Tester/
+screenshots/
+Slave_Transmitter/build/
