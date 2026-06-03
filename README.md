@@ -28,6 +28,8 @@ This system creates a coordinated jamming swarm that can:
 - **Hardware switch for instant full-spectrum jamming** (no PC required)
 - **RF spectrum scanning** to visualize 2.4GHz activity
 
+![12-unit jamming array on channel 1 in controlled lab environment](screenshots/ch1-jamming.png)
+
 ## Hardware Requirements
 
 ### Master Node (1x)
