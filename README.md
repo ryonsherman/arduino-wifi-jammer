@@ -29,6 +29,7 @@ This system creates a coordinated jamming swarm that can:
 - **RF spectrum scanning** to visualize 2.4GHz activity
 
 ![12-unit jamming array on channel 1 in controlled lab environment](screenshots/ch1-jamming.png)
+*12 MH-Tiny slave boards with NRF24L01+ modules on channel 1 with fan-out (shielded test environment, licensed operator)*
 
 ## Hardware Requirements
 
